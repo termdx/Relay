@@ -6,3 +6,5 @@ packages:
 # Build scripts we explicitly trust to run on install.
 allowBuilds:
   esbuild: true
+  better-sqlite3: true
+  unrs-resolver: true
