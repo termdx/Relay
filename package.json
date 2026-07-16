@@ -1,0 +1,16 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Relay — an AI-native operating system for software agencies.",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@11.13.1",
+  "scripts": {
+    "desktop:dev": "pnpm --filter @relay/desktop tauri dev",
+    "desktop:build": "pnpm --filter @relay/desktop tauri build",
+    "typecheck": "pnpm -r --if-present typecheck"
+  }
+}
