@@ -39,6 +39,14 @@ export class Meeting {
   @Column({ type: 'text', nullable: true })
   summary!: string | null;
 
+  /**
+   * The client's most recent response comment (from an approval decision).
+   * Surfaced here so the founder's read of the meeting shows *what* the client
+   * said — especially when they requested changes.
+   */
+  @Column({ type: 'text', nullable: true })
+  clientComment!: string | null;
+
   @OneToMany(() => MeetingTask, (task) => task.meeting, {
     cascade: true,
     eager: true,

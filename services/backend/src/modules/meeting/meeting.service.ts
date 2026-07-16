@@ -146,6 +146,7 @@ export class MeetingService {
     comment: string | null,
   ): Promise<void> {
     const meeting = await this.findOne(meetingId);
+    meeting.clientComment = comment;
 
     if (decision === 'CHANGES_REQUESTED') {
       meeting.status = 'CHANGES_REQUESTED';
@@ -156,6 +157,13 @@ export class MeetingService {
       return;
     }
 
+    // KNOWN LIMITATION (v0.1): this runs in an event handler with no retry or
+    // compensation. The stub never fails, so it's invisible today — but with a
+    // real GitHub adapter, a transient failure here leaves the approval APPROVED
+    // while the meeting stays PENDING_APPROVAL, and idempotency blocks a retry.
+    // This is exactly the durable-execution seam Temporal is meant to own
+    // (CLAUDE.md: "every external integration should have retries"). Move this
+    // to a Temporal activity before the real adapter ships.
     const published = await this.issuePublisher.publishIssues(
       meeting.githubRepo,
       meeting.tasks.map((task) => ({
