@@ -1,0 +1,28 @@
+{
+  "name": "@relay/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Relay Runtime API — a local daemon exposing the runtime over HTTP.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "relay-runtime": "./src/main.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@relay/runtime-client": "workspace:*",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

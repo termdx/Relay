@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.8.2",
+    "@relay/runtime": "workspace:*",
     "@relay/runtime-client": "workspace:*",
     "@relay/runtime-core": "workspace:*",
     "commander": "^12.1.0"

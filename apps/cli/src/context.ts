@@ -1,14 +1,16 @@
-import { InProcessClient } from '@relay/runtime-client';
+import { HttpClient, InProcessClient } from '@relay/runtime-client';
 import type { RuntimeApi } from '@relay/runtime-client';
 import { RuntimeError } from '@relay/runtime-core';
 import * as p from '@clack/prompts';
 
 /**
- * Resolve the Runtime API client. Today this is always in-process; in P6 it
- * will prefer a running daemon (HTTP) and fall back to in-process.
+ * Resolve the Runtime API client. If a daemon was detected (RELAY_RUNTIME_URL
+ * set by the preAction probe), talk to it over HTTP; otherwise run in-process.
+ * Either way the CLI is a thin client over the same RuntimeApi.
  */
 export function getClient(): RuntimeApi {
-  return new InProcessClient();
+  const url = process.env.RELAY_RUNTIME_URL;
+  return url ? new HttpClient(url) : new InProcessClient();
 }
 
 /** Wrap a command action so typed runtime errors print cleanly, not as stacks. */
