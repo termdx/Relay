@@ -16,6 +16,11 @@ import { MeetingService } from './meeting.service';
 export class MeetingController {
   constructor(private readonly meetings: MeetingService) {}
 
+  @Get()
+  list(): Promise<MeetingWithTasks[]> {
+    return this.meetings.list();
+  }
+
   @Post()
   create(@Body() dto: CreateMeetingDto): Promise<MeetingWithTasks> {
     return this.meetings.createFromTranscript(dto);

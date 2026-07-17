@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
 import { ApprovalService } from '../approval/approval.service';
 import { DRAFT_GENERATOR, type DraftGenerator } from '../ai/draft-generator';
@@ -75,6 +75,14 @@ export class MeetingService {
     });
 
     return this.findOne(id);
+  }
+
+  /** All meetings, newest activity first, for the desktop list. */
+  list(): Promise<MeetingWithTasks[]> {
+    return this.db.query.meetings.findMany({
+      with: { tasks: { orderBy: [asc(meetingTasks.position)] } },
+      orderBy: [desc(meetings.updatedAt)],
+    });
   }
 
   async findOne(id: string): Promise<MeetingWithTasks> {
