@@ -1,9 +1,4 @@
-import {
-  LayoutGrid,
-  LogOut,
-  Server,
-  Waypoints,
-} from "lucide-react";
+import { LayoutGrid, LogOut, Server } from "lucide-react";
 import * as React from "react";
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -30,9 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="grid h-screen grid-cols-[15rem_1fr] bg-background text-foreground">
       <aside className="flex flex-col border-r border-border bg-sidebar text-sidebar-foreground">
         <div className="flex items-center gap-2.5 px-4 py-4">
-          <div className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Waypoints className="size-4" />
-          </div>
+          <img src="/relay-logo.png" alt="" className="size-8" />
           <span className="font-semibold">Relay</span>
         </div>
 
