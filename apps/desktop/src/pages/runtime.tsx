@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { runtime, runtimeReachable } from "@/lib/api/runtime";
+import { fetchWorkspace, runtime, runtimeReachable } from "@/lib/api/runtime";
 
 export function RuntimePage() {
   const reachable = useQuery({
@@ -18,25 +18,35 @@ export function RuntimePage() {
     queryFn: runtimeReachable,
   });
 
-  const health = useQuery({
-    queryKey: ["runtime-health"],
-    queryFn: runtime.health,
+  // Which workspace does the daemon manage? Resolved once, then passed to
+  // every call — so nothing depends on a relative path.
+  const workspace = useQuery({
+    queryKey: ["runtime-workspace"],
+    queryFn: fetchWorkspace,
     enabled: reachable.data === true,
+    retry: false,
+  });
+  const root = workspace.data?.root;
+
+  const health = useQuery({
+    queryKey: ["runtime-health", root],
+    queryFn: () => runtime.health(root!),
+    enabled: Boolean(root),
   });
   const providers = useQuery({
-    queryKey: ["runtime-ai"],
-    queryFn: runtime.ai.list,
-    enabled: reachable.data === true,
+    queryKey: ["runtime-ai", root],
+    queryFn: () => runtime.ai.list(root!),
+    enabled: Boolean(root),
   });
   const modules = useQuery({
-    queryKey: ["runtime-modules"],
-    queryFn: runtime.modules.list,
-    enabled: reachable.data === true,
+    queryKey: ["runtime-modules", root],
+    queryFn: () => runtime.modules.list(root!),
+    enabled: Boolean(root),
   });
   const integrations = useQuery({
-    queryKey: ["runtime-integrations"],
-    queryFn: runtime.integrations.list,
-    enabled: reachable.data === true,
+    queryKey: ["runtime-integrations", root],
+    queryFn: () => runtime.integrations.list(root!),
+    enabled: Boolean(root),
   });
 
   const overall = health.data?.overall;
@@ -45,7 +55,11 @@ export function RuntimePage() {
     <>
       <PageHeader
         title="Runtime"
-        description="What this workspace has installed — providers, modules, integrations, services."
+        description={
+          workspace.data
+            ? `${workspace.data.organization} · ${workspace.data.root}`
+            : "What this workspace has installed — providers, modules, integrations, services."
+        }
         actions={
           overall && (
             <Badge
@@ -69,16 +83,20 @@ export function RuntimePage() {
             <Spinner className="size-5" />
           </div>
         ) : !reachable.data ? (
-          <div className="rounded-lg border border-dashed border-border py-16 text-center">
-            <p className="font-medium">Runtime daemon isn’t running</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Start it with{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                relay daemon start
-              </code>{" "}
-              to manage this workspace.
-            </p>
+          <Notice title="Runtime daemon isn’t running">
+            Start it with{" "}
+            <Code>pnpm --filter @relay/cli relay daemon start</Code> — run it
+            from inside your workspace directory.
+          </Notice>
+        ) : workspace.isLoading ? (
+          <div className="flex justify-center py-16 text-muted-foreground">
+            <Spinner className="size-5" />
           </div>
+        ) : workspace.isError ? (
+          <Notice title="Daemon is running, but not in a Relay workspace">
+            It serves the workspace it was started in. Restart it from your
+            workspace directory, or create one with <Code>relay init</Code>.
+          </Notice>
         ) : (
           <div className="grid grid-cols-2 gap-4">
             <Panel icon={Cpu} title="AI providers" query={providers}>
@@ -136,6 +154,31 @@ export function RuntimePage() {
         )}
       </div>
     </>
+  );
+}
+
+function Code({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+      {children}
+    </code>
+  );
+}
+
+function Notice({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-border py-16 text-center">
+      <p className="font-medium">{title}</p>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        {children}
+      </p>
+    </div>
   );
 }
 

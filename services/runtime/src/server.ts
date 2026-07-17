@@ -1,5 +1,31 @@
+import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { InProcessClient } from '@relay/runtime-client';
+
+/**
+ * Origins allowed to call the daemon from a browser context: the desktop app
+ * (Tauri's custom protocol) and its Vite dev server.
+ *
+ * Deliberately an allowlist, NOT `origin: true`. This daemon can mutate the
+ * workspace and drive Docker, and it listens on loopback — reflecting any
+ * origin would let any website the user visits drive their runtime. An
+ * allowlist also blocks DNS-rebinding, since the attacker's Origin won't match.
+ * Extra origins can be added via RELAY_CORS_ORIGINS (comma-separated).
+ */
+const DEFAULT_ORIGINS = [
+  'http://localhost:1420',
+  'http://127.0.0.1:1420',
+  'tauri://localhost',
+  'http://tauri.localhost',
+];
+
+function allowedOrigins(): Set<string> {
+  const extra = (process.env.RELAY_CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return new Set([...DEFAULT_ORIGINS, ...extra]);
+}
 
 /** Top-level RuntimeApi namespaces (and bare methods) callable over RPC. */
 const ALLOWED = new Set([
@@ -29,6 +55,17 @@ interface RpcBody {
 export function buildServer(): FastifyInstance {
   const app = Fastify({ logger: false });
   const client = new InProcessClient();
+  const origins = allowedOrigins();
+
+  // Registered without await: Fastify loads plugins on ready()/listen().
+  void app.register(cors, {
+    origin: (origin, cb) => {
+      // Non-browser callers (curl, the CLI) send no Origin — allow those.
+      if (!origin) return cb(null, true);
+      cb(null, origins.has(origin));
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+  });
 
   app.get('/health', () => ({
     status: 'ok',

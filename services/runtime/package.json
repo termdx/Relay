@@ -16,6 +16,7 @@
     "dev": "tsx src/main.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
     "@relay/runtime-client": "workspace:*",
     "fastify": "^5.2.0"
   },
