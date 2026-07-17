@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { registerAi } from './commands/ai';
 import { registerInit } from './commands/init';
 import { registerIntegration } from './commands/integration';
+import { registerLifecycle } from './commands/lifecycle';
 import { registerModule } from './commands/module';
 import { registerValidate } from './commands/validate';
 
@@ -25,6 +26,7 @@ registerInit(program);
 registerAi(program);
 registerModule(program);
 registerIntegration(program);
+registerLifecycle(program);
 registerValidate(program);
 
 program.parseAsync(process.argv);

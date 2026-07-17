@@ -16,6 +16,29 @@ const MODULES = {
     displayName: 'Projects',
     description: 'Clients, projects, and members — the base record module.',
     capabilities: { apiRoutes: true, storage: true },
+    services: [
+      {
+        name: 'backend',
+        image: 'relay-backend:local',
+        ports: ['3000:3000'],
+        env: {
+          PORT: '3000',
+          DATABASE_URL:
+            'postgresql://relay:${POSTGRES_PASSWORD}@postgres:5432/relay',
+          AI_PROVIDER: '${AI_PROVIDER}',
+          GEMINI_API_KEY: '${GEMINI_API_KEY}',
+          GEMINI_MODEL: '${GEMINI_MODEL}',
+        },
+        dependsOn: ['postgres'],
+        restart: 'unless-stopped',
+        healthcheck: {
+          test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health'],
+          interval: '15s',
+          timeout: '5s',
+          retries: 5,
+        },
+      },
+    ],
   },
   meeting: {
     id: 'meeting',

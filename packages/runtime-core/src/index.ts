@@ -15,4 +15,6 @@ export * from './registries/ai-provider-registry';
 export * from './registries/provider-health';
 export * from './registries/module-registry';
 export * from './registries/integration-registry';
+export * from './compose/compose-generator';
+export * from './lifecycle/service-lifecycle';
 export * from './engine';

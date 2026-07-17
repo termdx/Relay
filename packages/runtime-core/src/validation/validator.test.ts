@@ -4,7 +4,7 @@ import { integrationManifestSchema } from '../schemas/integration';
 import { moduleManifestSchema, type ModuleManifest } from '../schemas/module';
 import { validateWorkspace, type ValidationInput } from './validator';
 
-function mod(raw: Partial<ModuleManifest> & { id: string }): ModuleManifest {
+function mod(raw: { id: string } & Record<string, unknown>): ModuleManifest {
   return moduleManifestSchema.parse({ version: '0.1.0', ...raw });
 }
 

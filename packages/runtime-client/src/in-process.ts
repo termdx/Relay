@@ -6,9 +6,11 @@ import {
 import type {
   AiApi,
   AiProviderSummary,
+  ComposeApi,
   IntegrationsApi,
   ModulesApi,
   RuntimeApi,
+  RuntimeLifecycleApi,
   WorkspaceApi,
   WorkspaceInfo,
   WorkspaceInitInput,
@@ -118,6 +120,25 @@ export class InProcessClient implements RuntimeApi {
     },
     health: async (cwd, id) =>
       (await RuntimeEngine.open(cwd)).integrations.health(id),
+  };
+
+  readonly compose: ComposeApi = {
+    generate: async (cwd) => (await RuntimeEngine.open(cwd)).generate(),
+    config: async (cwd) => (await RuntimeEngine.open(cwd)).lifecycle.config(),
+  };
+
+  readonly runtime: RuntimeLifecycleApi = {
+    up: async (cwd) => (await RuntimeEngine.open(cwd)).up(),
+    down: async (cwd) => {
+      await (await RuntimeEngine.open(cwd)).lifecycle.down();
+    },
+    restart: async (cwd) => {
+      await (await RuntimeEngine.open(cwd)).lifecycle.restart();
+    },
+    logs: async (cwd, options) => {
+      await (await RuntimeEngine.open(cwd)).lifecycle.logs(options);
+    },
+    status: async (cwd) => (await RuntimeEngine.open(cwd)).lifecycle.status(),
   };
 
   validate = async (cwd: string): Promise<Diagnostic[]> => {

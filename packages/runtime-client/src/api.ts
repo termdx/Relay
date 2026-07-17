@@ -62,10 +62,13 @@ export interface AiApi {
 
 import type {
   Diagnostic,
+  GenerateResult,
   InstallPlan,
   IntegrationHealth,
   IntegrationManifest,
+  LogsOptions,
   ModuleManifest,
+  ServiceStatus,
 } from '@relay/runtime-core';
 
 export interface ModulesApi {
@@ -90,10 +93,25 @@ export interface IntegrationsApi {
   health(cwd: string, id: string): Promise<IntegrationHealth>;
 }
 
+export interface ComposeApi {
+  generate(cwd: string): Promise<GenerateResult>;
+  config(cwd: string): Promise<string>;
+}
+
+export interface RuntimeLifecycleApi {
+  up(cwd: string): Promise<GenerateResult>;
+  down(cwd: string): Promise<void>;
+  restart(cwd: string): Promise<void>;
+  logs(cwd: string, options: LogsOptions): Promise<void>;
+  status(cwd: string): Promise<ServiceStatus[]>;
+}
+
 export interface RuntimeApi {
   workspace: WorkspaceApi;
   ai: AiApi;
   modules: ModulesApi;
   integrations: IntegrationsApi;
+  compose: ComposeApi;
+  runtime: RuntimeLifecycleApi;
   validate(cwd: string): Promise<Diagnostic[]>;
 }
