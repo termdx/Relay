@@ -1,0 +1,25 @@
+{
+  "name": "@relay/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Relay CLI — a thin client over the Runtime API.",
+  "bin": {
+    "relay": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "relay": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.8.2",
+    "@relay/runtime-client": "workspace:*",
+    "@relay/runtime-core": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

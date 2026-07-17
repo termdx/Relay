@@ -1,0 +1,20 @@
+{
+  "name": "@relay/runtime-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed client SDK over the Relay Runtime API (in-process + HTTP transports).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@relay/runtime-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  }
+}
