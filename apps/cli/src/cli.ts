@@ -1,6 +1,7 @@
 #!/usr/bin/env -S npx tsx
 import { Command } from 'commander';
 import { registerAi } from './commands/ai';
+import { registerDoctor } from './commands/doctor';
 import { registerInit } from './commands/init';
 import { registerIntegration } from './commands/integration';
 import { registerLifecycle } from './commands/lifecycle';
@@ -28,5 +29,6 @@ registerModule(program);
 registerIntegration(program);
 registerLifecycle(program);
 registerValidate(program);
+registerDoctor(program);
 
 program.parseAsync(process.argv);

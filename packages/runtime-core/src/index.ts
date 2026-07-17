@@ -17,4 +17,5 @@ export * from './registries/module-registry';
 export * from './registries/integration-registry';
 export * from './compose/compose-generator';
 export * from './lifecycle/service-lifecycle';
+export * from './health/health-monitor';
 export * from './engine';

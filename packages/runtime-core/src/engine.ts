@@ -10,6 +10,7 @@ import {
   serializeCompose,
   serializeEnv,
 } from './compose/compose-generator';
+import { inspectHealth, type RuntimeHealth } from './health/health-monitor';
 import { ServiceLifecycle } from './lifecycle/service-lifecycle';
 import { ManifestStore } from './manifest/manifest-store';
 import { AiProviderRegistry } from './registries/ai-provider-registry';
@@ -182,6 +183,11 @@ export class RuntimeEngine {
     const result = await this.generate();
     await this.lifecycle.up();
     return result;
+  }
+
+  /** Full health: environment prerequisites, services, workspace diagnostics. */
+  async health(): Promise<RuntimeHealth> {
+    return inspectHealth(this.lifecycle, await this.validate());
   }
 
   /** Create a new workspace and open it. */

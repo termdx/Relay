@@ -66,22 +66,4 @@ export function registerLifecycle(program: Command): void {
         });
       });
     });
-
-  program
-    .command('status')
-    .description('Show running services')
-    .action(() => {
-      run(async () => {
-        const services = await getClient().runtime.status(process.cwd());
-        if (services.length === 0) {
-          p.log.info('No services running. Try: relay up');
-          return;
-        }
-        for (const s of services) {
-          p.log.info(
-            `${s.service.padEnd(14)} ${s.state}${s.health ? ` (${s.health})` : ''}`,
-          );
-        }
-      });
-    });
 }

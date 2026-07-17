@@ -68,6 +68,7 @@ import type {
   IntegrationManifest,
   LogsOptions,
   ModuleManifest,
+  RuntimeHealth,
   ServiceStatus,
 } from '@relay/runtime-core';
 
@@ -114,4 +115,5 @@ export interface RuntimeApi {
   compose: ComposeApi;
   runtime: RuntimeLifecycleApi;
   validate(cwd: string): Promise<Diagnostic[]>;
+  health(cwd: string): Promise<RuntimeHealth>;
 }

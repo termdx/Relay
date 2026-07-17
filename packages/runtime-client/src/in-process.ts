@@ -145,4 +145,9 @@ export class InProcessClient implements RuntimeApi {
     const engine = await RuntimeEngine.open(cwd);
     return engine.validate();
   };
+
+  health = async (cwd: string) => {
+    const engine = await RuntimeEngine.open(cwd);
+    return engine.health();
+  };
 }
