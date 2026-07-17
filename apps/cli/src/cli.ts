@@ -1,5 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { Command } from 'commander';
+import { registerAgent } from './commands/agent';
 import { registerAi } from './commands/ai';
 import { registerDaemon } from './commands/daemon';
 import { registerDoctor } from './commands/doctor';
@@ -8,6 +9,7 @@ import { registerIntegration } from './commands/integration';
 import { registerLifecycle } from './commands/lifecycle';
 import { registerModule } from './commands/module';
 import { registerValidate } from './commands/validate';
+import { registerWorkflow } from './commands/workflow';
 
 const program = new Command();
 
@@ -41,6 +43,8 @@ registerInit(program);
 registerAi(program);
 registerModule(program);
 registerIntegration(program);
+registerWorkflow(program);
+registerAgent(program);
 registerLifecycle(program);
 registerValidate(program);
 registerDoctor(program);

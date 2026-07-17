@@ -13,16 +13,40 @@ import {
 import { inspectHealth, type RuntimeHealth } from './health/health-monitor';
 import { ServiceLifecycle } from './lifecycle/service-lifecycle';
 import { ManifestStore } from './manifest/manifest-store';
+import { AgentRegistry, type CreateAgentInput } from './registries/agent-registry';
 import { AiProviderRegistry } from './registries/ai-provider-registry';
 import { IntegrationRegistry } from './registries/integration-registry';
 import { ModuleRegistry } from './registries/module-registry';
+import {
+  WorkflowRegistry,
+  type CreateWorkflowInput,
+} from './registries/workflow-registry';
+import {
+  scaffoldAgent,
+  scaffoldModule,
+  scaffoldWorkflow,
+} from './scaffold/scaffolder';
 import { EnvFileSecrets } from './secrets/env-file-secrets';
 import type { SecretsProvider } from './secrets/secrets-provider';
+import { agentManifestSchema, type AgentManifest } from './schemas/agent';
 import { aiProviderManifestSchema } from './schemas/ai-provider';
 import { integrationManifestSchema } from './schemas/integration';
-import { moduleManifestSchema } from './schemas/module';
+import { moduleManifestSchema, type ModuleManifest } from './schemas/module';
 import type { RelayConfig } from './schemas/relay';
+import { workflowManifestSchema, type WorkflowManifest } from './schemas/workflow';
 import { validateWorkspace, type Diagnostic } from './validation/validator';
+
+export interface CreateModuleInput {
+  id: string;
+  displayName?: string;
+  description?: string;
+  capabilities?: {
+    ui?: boolean;
+    apiRoutes?: boolean;
+    storage?: boolean;
+    ai?: boolean;
+  };
+}
 import {
   WorkspaceService,
   type InitOptions,
@@ -77,6 +101,52 @@ export class RuntimeEngine {
     );
   }
 
+  /** Workflow definitions (workflows/<id>.yaml). */
+  get workflows(): WorkflowRegistry {
+    return new WorkflowRegistry(
+      new ManifestStore(this.paths.workflowsDir, workflowManifestSchema, 'workflow'),
+    );
+  }
+
+  /** LangGraph agent definitions (agents/<id>.yaml). */
+  get agents(): AgentRegistry {
+    return new AgentRegistry(
+      new ManifestStore(this.paths.agentsDir, agentManifestSchema, 'agent'),
+    );
+  }
+
+  /** Create a custom module manifest + scaffold (relay module new). */
+  async createModule(input: CreateModuleInput): Promise<ModuleManifest> {
+    const manifest = moduleManifestSchema.parse({
+      id: input.id,
+      version: '0.1.0',
+      displayName: input.displayName,
+      description: input.description,
+      capabilities: input.capabilities,
+    });
+    await new ManifestStore(
+      this.paths.modulesDir,
+      moduleManifestSchema,
+      'module',
+    ).create(manifest);
+    await scaffoldModule(this.paths.modulesDir, manifest);
+    return manifest;
+  }
+
+  /** Create a workflow definition + scaffold (relay workflow new). */
+  async createWorkflow(input: CreateWorkflowInput): Promise<WorkflowManifest> {
+    const manifest = await this.workflows.create(input);
+    await scaffoldWorkflow(this.paths.workflowsDir, manifest);
+    return manifest;
+  }
+
+  /** Create an agent definition + LangGraph scaffold (relay agent new). */
+  async createAgent(input: CreateAgentInput): Promise<AgentManifest> {
+    const manifest = await this.agents.create(input);
+    await scaffoldAgent(this.paths.agentsDir, manifest);
+    return manifest;
+  }
+
   /** Current installed AI capabilities across all providers. */
   private async installedAiCapabilities(): Promise<string[]> {
     const providers = await this.ai.list();
@@ -110,6 +180,8 @@ export class RuntimeEngine {
       integrations: await this.integrations.list(),
       aiProviders: await this.ai.list(),
       secretRefs: await this.secrets.list(),
+      workflows: await this.workflows.list(),
+      agents: await this.agents.list(),
     });
   }
 

@@ -1,6 +1,8 @@
+import type { AgentManifest } from '../schemas/agent';
 import type { AiProviderManifest } from '../schemas/ai-provider';
 import type { IntegrationManifest } from '../schemas/integration';
 import type { ModuleManifest } from '../schemas/module';
+import type { WorkflowManifest } from '../schemas/workflow';
 
 export interface Diagnostic {
   level: 'error' | 'warning';
@@ -13,6 +15,8 @@ export interface ValidationInput {
   integrations: IntegrationManifest[];
   aiProviders: AiProviderManifest[];
   secretRefs: string[];
+  workflows?: WorkflowManifest[];
+  agents?: AgentManifest[];
 }
 
 /** Find a dependency cycle among installed modules, if any. */
@@ -100,6 +104,36 @@ export function validateWorkspace(input: ValidationInput): Diagnostic[] {
           message: `integration "${integration.id}" needs secret "${field.secretRef}", which is not set`,
         });
       }
+    }
+  }
+
+  const workflowIds = new Set((input.workflows ?? []).map((w) => w.id));
+  for (const workflow of input.workflows ?? []) {
+    if (workflow.module && !moduleIds.has(workflow.module)) {
+      diagnostics.push({
+        level: 'error',
+        code: 'MISSING_WORKFLOW_MODULE',
+        message: `workflow "${workflow.id}" references module "${workflow.module}", which is not installed`,
+      });
+    }
+  }
+
+  const providerIds = new Set(input.aiProviders.map((p) => p.id));
+  for (const agent of input.agents ?? []) {
+    if (agent.workflow && !workflowIds.has(agent.workflow)) {
+      diagnostics.push({
+        level: 'error',
+        code: 'MISSING_AGENT_WORKFLOW',
+        message: `agent "${agent.id}" references workflow "${agent.workflow}", which does not exist`,
+      });
+    }
+    const providerPrefix = agent.model.split('/')[0];
+    if (providerPrefix && !providerIds.has(providerPrefix)) {
+      diagnostics.push({
+        level: 'warning',
+        code: 'UNKNOWN_AGENT_PROVIDER',
+        message: `agent "${agent.id}" uses model "${agent.model}" but no AI provider "${providerPrefix}" is installed`,
+      });
     }
   }
 

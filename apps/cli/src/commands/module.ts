@@ -53,6 +53,67 @@ export function registerModule(program: Command): void {
     });
 
   module
+    .command('new <id>')
+    .description('Scaffold a new custom module')
+    .option('--name <name>', 'display name')
+    .option('--description <text>', 'description')
+    .option('--ui', 'exposes UI')
+    .option('--api', 'exposes API routes')
+    .option('--storage', 'requires storage')
+    .option('--ai', 'requires AI')
+    .option('-y, --yes', 'skip prompts')
+    .action(
+      (
+        id: string,
+        options: {
+          name?: string;
+          description?: string;
+          ui?: boolean;
+          api?: boolean;
+          storage?: boolean;
+          ai?: boolean;
+          yes?: boolean;
+        },
+      ) => {
+        run(async () => {
+          let capabilities = {
+            ui: Boolean(options.ui),
+            apiRoutes: Boolean(options.api),
+            storage: Boolean(options.storage),
+            ai: Boolean(options.ai),
+          };
+          if (!options.yes && !options.ui && !options.api && !options.storage && !options.ai) {
+            const picked = ensure(
+              await p.multiselect({
+                message: 'What does this module expose?',
+                options: [
+                  { value: 'ui', label: 'UI' },
+                  { value: 'apiRoutes', label: 'API routes' },
+                  { value: 'storage', label: 'Storage' },
+                  { value: 'ai', label: 'AI' },
+                ],
+                required: false,
+              }),
+            ) as string[];
+            capabilities = {
+              ui: picked.includes('ui'),
+              apiRoutes: picked.includes('apiRoutes'),
+              storage: picked.includes('storage'),
+              ai: picked.includes('ai'),
+            };
+          }
+          const manifest = await getClient().modules.create(process.cwd(), {
+            id,
+            displayName: options.name,
+            description: options.description,
+            capabilities,
+          });
+          p.log.success(`Created module "${manifest.id}" (+ scaffold)`);
+        });
+      },
+    );
+
+  module
     .command('add <id>')
     .description('Install a module (resolves dependencies)')
     .option('-y, --yes', 'install dependencies without asking')

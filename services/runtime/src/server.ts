@@ -7,6 +7,8 @@ const ALLOWED = new Set([
   'ai',
   'modules',
   'integrations',
+  'workflows',
+  'agents',
   'compose',
   'runtime',
   'validate',

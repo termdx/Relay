@@ -1,11 +1,13 @@
 import { InProcessClient } from './in-process';
 import type {
+  AgentsApi,
   AiApi,
   ComposeApi,
   IntegrationsApi,
   ModulesApi,
   RuntimeApi,
   RuntimeLifecycleApi,
+  WorkflowsApi,
   WorkspaceApi,
 } from './api';
 
@@ -64,7 +66,22 @@ export class HttpClient implements RuntimeApi {
     plan: (cwd, id) => this.rpc(['modules', 'plan'], [cwd, id]),
     add: (cwd, id, withDependencies) =>
       this.rpc(['modules', 'add'], [cwd, id, withDependencies]),
+    create: (cwd, input) => this.rpc(['modules', 'create'], [cwd, input]),
     remove: (cwd, id) => this.rpc(['modules', 'remove'], [cwd, id]),
+  };
+
+  readonly workflows: WorkflowsApi = {
+    list: (cwd) => this.rpc(['workflows', 'list'], [cwd]),
+    info: (cwd, id) => this.rpc(['workflows', 'info'], [cwd, id]),
+    create: (cwd, input) => this.rpc(['workflows', 'create'], [cwd, input]),
+    remove: (cwd, id) => this.rpc(['workflows', 'remove'], [cwd, id]),
+  };
+
+  readonly agents: AgentsApi = {
+    list: (cwd) => this.rpc(['agents', 'list'], [cwd]),
+    info: (cwd, id) => this.rpc(['agents', 'info'], [cwd, id]),
+    create: (cwd, input) => this.rpc(['agents', 'create'], [cwd, input]),
+    remove: (cwd, id) => this.rpc(['agents', 'remove'], [cwd, id]),
   };
 
   readonly integrations: IntegrationsApi = {

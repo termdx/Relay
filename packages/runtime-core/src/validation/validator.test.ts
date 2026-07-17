@@ -75,6 +75,37 @@ describe('validateWorkspace', () => {
     expect(validateWorkspace(input)).toEqual([]);
   });
 
+  it('flags a workflow referencing a missing module and an agent with an unknown provider', () => {
+    const input: ValidationInput = {
+      ...base,
+      workflows: [
+        {
+          kind: 'workflow',
+          id: 'orphan',
+          version: '0.1.0',
+          module: 'nonexistent',
+          triggers: [],
+          definition: {},
+        },
+      ],
+      agents: [
+        {
+          kind: 'agent',
+          id: 'rogue',
+          version: '0.1.0',
+          name: 'Rogue',
+          model: 'mistral/large',
+          tools: [],
+          memory: { enabled: false, kind: 'none' },
+          config: {},
+        },
+      ],
+    };
+    const found = codes(input);
+    expect(found).toContain('MISSING_WORKFLOW_MODULE');
+    expect(found).toContain('UNKNOWN_AGENT_PROVIDER');
+  });
+
   it('flags host-port conflicts across modules', () => {
     const input: ValidationInput = {
       ...base,

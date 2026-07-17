@@ -4,6 +4,7 @@ import {
   type Diagnostic,
 } from '@relay/runtime-core';
 import type {
+  AgentsApi,
   AiApi,
   AiProviderSummary,
   ComposeApi,
@@ -11,6 +12,7 @@ import type {
   ModulesApi,
   RuntimeApi,
   RuntimeLifecycleApi,
+  WorkflowsApi,
   WorkspaceApi,
   WorkspaceInfo,
   WorkspaceInitInput,
@@ -100,9 +102,33 @@ export class InProcessClient implements RuntimeApi {
     plan: async (cwd, id) => (await RuntimeEngine.open(cwd)).planModule(id),
     add: async (cwd, id, withDependencies) =>
       (await RuntimeEngine.open(cwd)).addModule(id, withDependencies),
+    create: async (cwd, input) =>
+      (await RuntimeEngine.open(cwd)).createModule(input),
     remove: async (cwd, id) => {
       const engine = await RuntimeEngine.open(cwd);
       await engine.modules.remove(id);
+    },
+  };
+
+  readonly workflows: WorkflowsApi = {
+    list: async (cwd) => (await RuntimeEngine.open(cwd)).workflows.list(),
+    info: async (cwd, id) => (await RuntimeEngine.open(cwd)).workflows.info(id),
+    create: async (cwd, input) =>
+      (await RuntimeEngine.open(cwd)).createWorkflow(input),
+    remove: async (cwd, id) => {
+      const engine = await RuntimeEngine.open(cwd);
+      await engine.workflows.remove(id);
+    },
+  };
+
+  readonly agents: AgentsApi = {
+    list: async (cwd) => (await RuntimeEngine.open(cwd)).agents.list(),
+    info: async (cwd, id) => (await RuntimeEngine.open(cwd)).agents.info(id),
+    create: async (cwd, input) =>
+      (await RuntimeEngine.open(cwd)).createAgent(input),
+    remove: async (cwd, id) => {
+      const engine = await RuntimeEngine.open(cwd);
+      await engine.agents.remove(id);
     },
   };
 

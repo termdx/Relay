@@ -61,6 +61,10 @@ export interface AiApi {
 }
 
 import type {
+  AgentManifest,
+  CreateAgentInput,
+  CreateModuleInput,
+  CreateWorkflowInput,
   Diagnostic,
   GenerateResult,
   InstallPlan,
@@ -70,6 +74,7 @@ import type {
   ModuleManifest,
   RuntimeHealth,
   ServiceStatus,
+  WorkflowManifest,
 } from '@relay/runtime-core';
 
 export interface ModulesApi {
@@ -78,6 +83,21 @@ export interface ModulesApi {
   info(cwd: string, id: string): Promise<ModuleManifest>;
   plan(cwd: string, id: string): Promise<InstallPlan>;
   add(cwd: string, id: string, withDependencies: boolean): Promise<InstallPlan>;
+  create(cwd: string, input: CreateModuleInput): Promise<ModuleManifest>;
+  remove(cwd: string, id: string): Promise<void>;
+}
+
+export interface WorkflowsApi {
+  list(cwd: string): Promise<WorkflowManifest[]>;
+  info(cwd: string, id: string): Promise<WorkflowManifest>;
+  create(cwd: string, input: CreateWorkflowInput): Promise<WorkflowManifest>;
+  remove(cwd: string, id: string): Promise<void>;
+}
+
+export interface AgentsApi {
+  list(cwd: string): Promise<AgentManifest[]>;
+  info(cwd: string, id: string): Promise<AgentManifest>;
+  create(cwd: string, input: CreateAgentInput): Promise<AgentManifest>;
   remove(cwd: string, id: string): Promise<void>;
 }
 
@@ -112,6 +132,8 @@ export interface RuntimeApi {
   ai: AiApi;
   modules: ModulesApi;
   integrations: IntegrationsApi;
+  workflows: WorkflowsApi;
+  agents: AgentsApi;
   compose: ComposeApi;
   runtime: RuntimeLifecycleApi;
   validate(cwd: string): Promise<Diagnostic[]>;
