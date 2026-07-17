@@ -10,6 +10,7 @@
   "packageManager": "pnpm@11.13.1",
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "dev:local": "RELAY_DEV=local node scripts/dev.mjs",
     "dev:web": "RELAY_DESKTOP=web node scripts/dev.mjs",
     "desktop:dev": "pnpm --filter @relay/desktop tauri dev",
     "desktop:build": "pnpm --filter @relay/desktop tauri build",
