@@ -6,8 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { asc, eq } from 'drizzle-orm';
+import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
 import { ApprovalService } from '../approval/approval.service';
 import { DRAFT_GENERATOR, type DraftGenerator } from '../ai/draft-generator';
 import {
@@ -16,21 +16,25 @@ import {
 } from '../integration/github/github-issue-publisher';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { UpdateMeetingDraftDto } from './dto/update-meeting-draft.dto';
-import { Meeting } from './entities/meeting.entity';
-import { MeetingTask } from './entities/meeting-task.entity';
+import {
+  meetingTasks,
+  meetings,
+  type MeetingStatus,
+  type MeetingWithTasks,
+} from './meeting.schema';
 
 /** Statuses from which the founder may still edit / (re)send the draft. */
-const EDITABLE_STATUSES = new Set(['DRAFTED', 'CHANGES_REQUESTED']);
+const EDITABLE_STATUSES = new Set<MeetingStatus>([
+  'DRAFTED',
+  'CHANGES_REQUESTED',
+]);
 
 @Injectable()
 export class MeetingService {
   private readonly logger = new Logger(MeetingService.name);
 
   constructor(
-    @InjectRepository(Meeting)
-    private readonly meetings: Repository<Meeting>,
-    @InjectRepository(MeetingTask)
-    private readonly tasks: Repository<MeetingTask>,
+    @Inject(DRIZZLE) private readonly db: RelayDb,
     @Inject(DRAFT_GENERATOR)
     private readonly draftGenerator: DraftGenerator,
     @Inject(GITHUB_ISSUE_PUBLISHER)
@@ -40,32 +44,44 @@ export class MeetingService {
   ) {}
 
   /** Ingest a transcript, generate a draft, persist it for review. */
-  async createFromTranscript(dto: CreateMeetingDto): Promise<Meeting> {
+  async createFromTranscript(dto: CreateMeetingDto): Promise<MeetingWithTasks> {
     const draft = await this.draftGenerator.generateDraft(dto.transcript);
 
-    const meeting = this.meetings.create({
-      title: dto.title,
-      transcript: dto.transcript,
-      clientEmail: dto.clientEmail,
-      githubRepo: dto.githubRepo,
-      status: 'DRAFTED',
-      summary: draft.summary,
-      tasks: draft.tasks.map((task, index) =>
-        this.tasks.create({
-          title: task.title,
-          body: task.body,
-          assignee: task.assignee ?? null,
-          githubIssueUrl: null,
-          position: index,
-        }),
-      ),
+    const id = await this.db.transaction(async (tx) => {
+      const [meeting] = await tx
+        .insert(meetings)
+        .values({
+          title: dto.title,
+          transcript: dto.transcript,
+          clientEmail: dto.clientEmail,
+          githubRepo: dto.githubRepo,
+          status: 'DRAFTED',
+          summary: draft.summary,
+        })
+        .returning({ id: meetings.id });
+
+      if (draft.tasks.length > 0) {
+        await tx.insert(meetingTasks).values(
+          draft.tasks.map((task, index) => ({
+            meetingId: meeting!.id,
+            title: task.title,
+            body: task.body,
+            assignee: task.assignee ?? null,
+            position: index,
+          })),
+        );
+      }
+      return meeting!.id;
     });
 
-    return this.meetings.save(meeting);
+    return this.findOne(id);
   }
 
-  async findOne(id: string): Promise<Meeting> {
-    const meeting = await this.meetings.findOne({ where: { id } });
+  async findOne(id: string): Promise<MeetingWithTasks> {
+    const meeting = await this.db.query.meetings.findFirst({
+      where: eq(meetings.id, id),
+      with: { tasks: { orderBy: [asc(meetingTasks.position)] } },
+    });
     if (!meeting) {
       throw new NotFoundException(`Meeting ${id} not found.`);
     }
@@ -76,24 +92,27 @@ export class MeetingService {
   async updateDraft(
     id: string,
     dto: UpdateMeetingDraftDto,
-  ): Promise<Meeting> {
+  ): Promise<MeetingWithTasks> {
     const meeting = await this.findOne(id);
-    this.assertEditable(meeting);
+    this.assertEditable(meeting.status);
 
-    await this.tasks.delete({ meeting: { id } });
+    await this.db.transaction(async (tx) => {
+      await tx.update(meetings).set({ summary: dto.summary }).where(eq(meetings.id, id));
+      await tx.delete(meetingTasks).where(eq(meetingTasks.meetingId, id));
+      if (dto.tasks.length > 0) {
+        await tx.insert(meetingTasks).values(
+          dto.tasks.map((task, index) => ({
+            meetingId: id,
+            title: task.title,
+            body: task.body ?? '',
+            assignee: task.assignee ?? null,
+            position: index,
+          })),
+        );
+      }
+    });
 
-    meeting.summary = dto.summary;
-    meeting.tasks = dto.tasks.map((task, index) =>
-      this.tasks.create({
-        title: task.title,
-        body: task.body ?? '',
-        assignee: task.assignee ?? null,
-        githubIssueUrl: null,
-        position: index,
-      }),
-    );
-
-    return this.meetings.save(meeting);
+    return this.findOne(id);
   }
 
   /**
@@ -102,24 +121,24 @@ export class MeetingService {
    */
   async sendForApproval(
     id: string,
-  ): Promise<{ meeting: Meeting; approvalUrl: string }> {
+  ): Promise<{ meeting: MeetingWithTasks; approvalUrl: string }> {
     const meeting = await this.findOne(id);
-    this.assertEditable(meeting);
+    this.assertEditable(meeting.status);
 
     const approval = await this.approvals.createForMeeting(meeting.id, {
       title: meeting.title,
       summary: meeting.summary ?? '',
-      tasks: meeting.tasks
-        .sort((a, b) => a.position - b.position)
-        .map((task) => ({
-          title: task.title,
-          body: task.body,
-          assignee: task.assignee,
-        })),
+      tasks: meeting.tasks.map((task) => ({
+        title: task.title,
+        body: task.body,
+        assignee: task.assignee,
+      })),
     });
 
-    meeting.status = 'PENDING_APPROVAL';
-    await this.meetings.save(meeting);
+    await this.db
+      .update(meetings)
+      .set({ status: 'PENDING_APPROVAL' })
+      .where(eq(meetings.id, id));
 
     const baseUrl = this.config.get<string>(
       'PUBLIC_BASE_URL',
@@ -133,7 +152,7 @@ export class MeetingService {
       `Approval link for "${meeting.title}" (client ${meeting.clientEmail}): ${approvalUrl}`,
     );
 
-    return { meeting, approvalUrl };
+    return { meeting: await this.findOne(id), approvalUrl };
   }
 
   /**
@@ -146,11 +165,12 @@ export class MeetingService {
     comment: string | null,
   ): Promise<void> {
     const meeting = await this.findOne(meetingId);
-    meeting.clientComment = comment;
 
     if (decision === 'CHANGES_REQUESTED') {
-      meeting.status = 'CHANGES_REQUESTED';
-      await this.meetings.save(meeting);
+      await this.db
+        .update(meetings)
+        .set({ status: 'CHANGES_REQUESTED', clientComment: comment })
+        .where(eq(meetings.id, meetingId));
       this.logger.log(
         `Meeting ${meetingId} — client requested changes${comment ? `: "${comment}"` : ''}.`,
       );
@@ -173,27 +193,32 @@ export class MeetingService {
       })),
     );
 
-    const ordered = [...meeting.tasks].sort(
-      (a, b) => a.position - b.position,
-    );
-    published.forEach((issue, index) => {
-      const task = ordered[index];
-      if (task) {
-        task.githubIssueUrl = issue.url;
-      }
+    await this.db.transaction(async (tx) => {
+      await Promise.all(
+        published.map((issue, index) => {
+          const task = meeting.tasks[index];
+          if (!task) return Promise.resolve();
+          return tx
+            .update(meetingTasks)
+            .set({ githubIssueUrl: issue.url })
+            .where(eq(meetingTasks.id, task.id));
+        }),
+      );
+      await tx
+        .update(meetings)
+        .set({ status: 'APPROVED', clientComment: comment })
+        .where(eq(meetings.id, meetingId));
     });
 
-    meeting.status = 'APPROVED';
-    await this.meetings.save(meeting);
     this.logger.log(
       `Meeting ${meetingId} approved — ${published.length} tasks pushed to ${meeting.githubRepo}.`,
     );
   }
 
-  private assertEditable(meeting: Meeting): void {
-    if (!EDITABLE_STATUSES.has(meeting.status)) {
+  private assertEditable(status: MeetingStatus): void {
+    if (!EDITABLE_STATUSES.has(status)) {
       throw new BadRequestException(
-        `Meeting is ${meeting.status}; it can no longer be edited or sent.`,
+        `Meeting is ${status}; it can no longer be edited or sent.`,
       );
     }
   }

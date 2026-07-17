@@ -1,25 +1,22 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'node:crypto';
-import { Repository } from 'typeorm';
+import { and, eq } from 'drizzle-orm';
+import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
+import { APPROVAL_DECIDED, type ApprovalDecidedEvent } from './approval.events';
 import {
-  APPROVAL_DECIDED,
-  ApprovalDecidedEvent,
-} from './approval.events';
-import {
-  Approval,
-  ApprovalPayload,
-  ApprovalStatus,
-} from './entities/approval.entity';
+  approvals,
+  type Approval,
+  type ApprovalPayload,
+  type ApprovalStatus,
+} from './approval.schema';
 
 @Injectable()
 export class ApprovalService {
   private readonly logger = new Logger(ApprovalService.name);
 
   constructor(
-    @InjectRepository(Approval)
-    private readonly approvals: Repository<Approval>,
+    @Inject(DRIZZLE) private readonly db: RelayDb,
     private readonly events: EventEmitter2,
   ) {}
 
@@ -28,19 +25,22 @@ export class ApprovalService {
     meetingId: string,
     payload: ApprovalPayload,
   ): Promise<Approval> {
-    const approval = this.approvals.create({
-      meetingId,
-      token: randomBytes(24).toString('base64url'),
-      status: 'PENDING',
-      payload,
-      clientComment: null,
-      respondedAt: null,
-    });
-    return this.approvals.save(approval);
+    const [approval] = await this.db
+      .insert(approvals)
+      .values({
+        meetingId,
+        token: randomBytes(24).toString('base64url'),
+        status: 'PENDING',
+        payload,
+      })
+      .returning();
+    return approval!;
   }
 
   async getByToken(token: string): Promise<Approval> {
-    const approval = await this.approvals.findOne({ where: { token } });
+    const approval = await this.db.query.approvals.findFirst({
+      where: eq(approvals.token, token),
+    });
     if (!approval) {
       throw new NotFoundException('Approval link is invalid or has expired.');
     }
@@ -48,36 +48,38 @@ export class ApprovalService {
   }
 
   /**
-   * Record a client's decision. Idempotent-safe: a second response to an
-   * already-decided approval is rejected rather than silently overwritten.
+   * Record a client's decision. A second response to an already-decided
+   * approval is rejected rather than silently overwritten — enforced in the
+   * UPDATE's WHERE clause, so concurrent submits cannot both win.
    */
   async respond(
     token: string,
     decision: Exclude<ApprovalStatus, 'PENDING'>,
     comment: string | null,
   ): Promise<Approval> {
-    const approval = await this.getByToken(token);
+    const [updated] = await this.db
+      .update(approvals)
+      .set({ status: decision, clientComment: comment, respondedAt: new Date() })
+      .where(and(eq(approvals.token, token), eq(approvals.status, 'PENDING')))
+      .returning();
 
-    if (approval.status !== 'PENDING') {
+    if (!updated) {
+      // Either the token is unknown (404) or it was already decided.
+      const existing = await this.getByToken(token);
       this.logger.warn(
-        `Approval ${approval.id} already decided (${approval.status}); ignoring repeat response.`,
+        `Approval ${existing.id} already decided (${existing.status}); ignoring repeat response.`,
       );
-      return approval;
+      return existing;
     }
 
-    approval.status = decision;
-    approval.clientComment = comment;
-    approval.respondedAt = new Date();
-    const saved = await this.approvals.save(approval);
-
     const event: ApprovalDecidedEvent = {
-      meetingId: saved.meetingId,
-      approvalId: saved.id,
+      meetingId: updated.meetingId,
+      approvalId: updated.id,
       decision,
       comment,
     };
     this.events.emit(APPROVAL_DECIDED, event);
 
-    return saved;
+    return updated;
   }
 }

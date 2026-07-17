@@ -1,36 +1,43 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { sql } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { DRIZZLE, type RelayDb } from './drizzle.provider';
 
-interface ExtensionRow {
-  version: string;
-}
+type ExtensionRow = { extversion: string } & Record<string, unknown>;
 
 /**
- * Ensures Postgres has the extensions Relay depends on.
+ * Prepares the database on boot, in a deliberate order:
  *
- * `vector` (pgvector) is enabled up front so the knowledge base can store
- * embeddings without a later migration to turn it on.
+ *   1. enable the `vector` (pgvector) extension
+ *   2. run migrations
  *
- * ORDERING CAVEAT: this runs *after* TypeORM's `synchronize`. That is fine
- * while no entity declares a `vector` column. The moment one does, schema sync
- * would run before the extension exists — at that point move extension setup
- * into a migration that runs first (migrations are needed before real data
- * lands anyway).
+ * The extension is created *first* so that a migration is free to declare a
+ * vector column — the knowledge base can land without any bootstrap change.
  */
 @Injectable()
 export class DatabaseBootstrapService implements OnModuleInit {
   private readonly logger = new Logger(DatabaseBootstrapService.name);
 
   constructor(
-    @InjectDataSource() private readonly dataSource: DataSource,
+    @Inject(DRIZZLE) private readonly db: RelayDb,
+    private readonly config: ConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.dataSource.query('CREATE EXTENSION IF NOT EXISTS vector');
-    const rows = (await this.dataSource.query(
-      "SELECT extversion AS version FROM pg_extension WHERE extname = 'vector'",
-    )) as ExtensionRow[];
-    this.logger.log(`pgvector ready (v${rows[0]?.version ?? 'unknown'})`);
+    await this.db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
+
+    const migrationsFolder = this.config.get<string>(
+      'DRIZZLE_MIGRATIONS',
+      'drizzle',
+    );
+    await migrate(this.db, { migrationsFolder });
+
+    const result = await this.db.execute<ExtensionRow>(
+      sql`SELECT extversion FROM pg_extension WHERE extname = 'vector'`,
+    );
+    this.logger.log(
+      `schema migrated; pgvector ready (v${result.rows[0]?.extversion ?? 'unknown'})`,
+    );
   }
 }

@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { UpdateMeetingDraftDto } from './dto/update-meeting-draft.dto';
-import { Meeting } from './entities/meeting.entity';
+import type { MeetingWithTasks } from './meeting.schema';
 import { MeetingService } from './meeting.service';
 
 /** Thin controller: validate, invoke service, return. No business logic. */
@@ -17,12 +17,12 @@ export class MeetingController {
   constructor(private readonly meetings: MeetingService) {}
 
   @Post()
-  create(@Body() dto: CreateMeetingDto): Promise<Meeting> {
+  create(@Body() dto: CreateMeetingDto): Promise<MeetingWithTasks> {
     return this.meetings.createFromTranscript(dto);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Promise<Meeting> {
+  findOne(@Param('id') id: string): Promise<MeetingWithTasks> {
     return this.meetings.findOne(id);
   }
 
@@ -30,14 +30,14 @@ export class MeetingController {
   updateDraft(
     @Param('id') id: string,
     @Body() dto: UpdateMeetingDraftDto,
-  ): Promise<Meeting> {
+  ): Promise<MeetingWithTasks> {
     return this.meetings.updateDraft(id, dto);
   }
 
   @Post(':id/send-for-approval')
   sendForApproval(
     @Param('id') id: string,
-  ): Promise<{ meeting: Meeting; approvalUrl: string }> {
+  ): Promise<{ meeting: MeetingWithTasks; approvalUrl: string }> {
     return this.meetings.sendForApproval(id);
   }
 }

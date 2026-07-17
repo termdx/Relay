@@ -17,7 +17,7 @@ COPY package.json ./
 # pnpm 11 hard-fails on unapproved build scripts and reads the approval list from
 # pnpm-workspace.yaml. Generated here rather than committed, so services/backend
 # never becomes a nested workspace root in the repo.
-RUN printf 'allowBuilds:\n  "@google/genai": true\n  protobufjs: true\n  unrs-resolver: true\n' > pnpm-workspace.yaml
+RUN printf 'allowBuilds:\n  "@google/genai": true\n  protobufjs: true\n  unrs-resolver: true\n  esbuild: true\n' > pnpm-workspace.yaml
 RUN pnpm install
 
 # Compile TypeScript, then drop dev dependencies from node_modules.
@@ -35,6 +35,8 @@ WORKDIR /app
 COPY package.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
+# SQL migrations are applied on boot by DatabaseBootstrapService.
+COPY --chown=node:node drizzle ./drizzle
 
 USER node
 

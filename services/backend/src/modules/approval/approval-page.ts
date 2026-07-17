@@ -1,4 +1,4 @@
-import { Approval } from './entities/approval.entity';
+import type { Approval } from './approval.schema';
 
 function escapeHtml(value: string): string {
   return value
