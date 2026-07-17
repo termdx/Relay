@@ -1,6 +1,9 @@
 import { join } from 'node:path';
+import { ManifestStore } from './manifest/manifest-store';
+import { AiProviderRegistry } from './registries/ai-provider-registry';
 import { EnvFileSecrets } from './secrets/env-file-secrets';
 import type { SecretsProvider } from './secrets/secrets-provider';
+import { aiProviderManifestSchema } from './schemas/ai-provider';
 import type { RelayConfig } from './schemas/relay';
 import {
   WorkspaceService,
@@ -19,6 +22,14 @@ export class RuntimeEngine {
     readonly config: RelayConfig,
     readonly secrets: SecretsProvider,
   ) {}
+
+  /** Installed AI providers (ai/<id>.yaml). */
+  get ai(): AiProviderRegistry {
+    return new AiProviderRegistry(
+      new ManifestStore(this.paths.aiDir, aiProviderManifestSchema, 'ai-provider'),
+      this.secrets,
+    );
+  }
 
   /** Create a new workspace and open it. */
   static async init(dir: string, opts: InitOptions): Promise<RuntimeEngine> {

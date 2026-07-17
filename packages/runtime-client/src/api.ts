@@ -27,6 +27,40 @@ export interface WorkspaceApi {
   info(cwd: string): Promise<WorkspaceInfo>;
 }
 
+export interface AiAddInput {
+  cwd: string;
+  provider: string;
+  id?: string;
+  apiKey?: string;
+  endpoint?: string;
+  defaultModel?: string;
+}
+
+export interface AiProviderSummary {
+  id: string;
+  provider: string;
+  defaultModel?: string;
+  hasApiKey: boolean;
+  models: string[];
+}
+
+export interface AiHealth {
+  id: string;
+  status: 'ok' | 'error' | 'unknown';
+  detail?: string;
+  models?: string[];
+}
+
+export interface AiApi {
+  add(input: AiAddInput): Promise<AiProviderSummary>;
+  list(cwd: string): Promise<AiProviderSummary[]>;
+  info(cwd: string, id: string): Promise<AiProviderSummary>;
+  remove(cwd: string, id: string): Promise<void>;
+  health(cwd: string, id: string): Promise<AiHealth>;
+  models(cwd: string, id: string): Promise<string[]>;
+}
+
 export interface RuntimeApi {
   workspace: WorkspaceApi;
+  ai: AiApi;
 }

@@ -8,4 +8,6 @@ export * from './workspace/workspace-service';
 export * from './secrets/secrets-provider';
 export * from './secrets/env-file-secrets';
 export * from './util/fs';
+export * from './registries/ai-provider-registry';
+export * from './registries/provider-health';
 export * from './engine';
