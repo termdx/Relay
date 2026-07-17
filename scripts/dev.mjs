@@ -138,6 +138,10 @@ async function runtimeOwned() {
     log(C.err, "runtime", "daemon didn't come up"); process.exit(1);
   }
 
+  // Only one Relay Postgres runs at a time — stop a lingering dev:local one so
+  // it doesn't sit idle alongside the runtime-owned stack.
+  silent(`docker rm -f ${LOCAL_PG.container}`);
+
   // Ensure the default workspace can produce a backend, then let the runtime
   // bring the stack up. Both are idempotent.
   log(C.rt, "runtime", "ensuring backend module + starting stack…");
@@ -151,6 +155,8 @@ async function runtimeOwned() {
 
 async function localMode() {
   ensureDocker();
+  // Stop the runtime-owned stack first so only one Relay Postgres runs.
+  silent(`${CLI_TSX} ${CLI} -C ${DEFAULT_WS} down`);
   // standalone pg container (fast backend iteration path)
   const state = (() => {
     try { return execSync(`docker inspect -f '{{.State.Status}}' ${LOCAL_PG.container}`, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); }

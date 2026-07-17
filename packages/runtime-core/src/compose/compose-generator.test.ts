@@ -21,6 +21,8 @@ describe('buildComposeFile', () => {
     expect(compose.services.backend?.depends_on).toContain('postgres');
     expect(compose.networks).toHaveProperty('relay');
     expect(compose.volumes).toHaveProperty('relay_pgdata');
+    // Postgres stays internal (the generated compose is also the prod artifact).
+    expect(compose.services.postgres?.ports).toBeUndefined();
   });
 
   it('omits postgres when no module needs storage', () => {
