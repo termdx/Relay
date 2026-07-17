@@ -36,6 +36,9 @@ jobs:
       - name: Typecheck all packages
         run: pnpm -r --if-present typecheck
 
+      - name: Test runtime packages
+        run: pnpm --filter @relay/runtime-core --filter @relay/runtime test
+
       - name: Build desktop frontend
         run: pnpm --filter @relay/desktop build
 
