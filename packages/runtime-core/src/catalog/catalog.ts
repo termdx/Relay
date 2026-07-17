@@ -32,7 +32,13 @@ const MODULES = {
         dependsOn: ['postgres'],
         restart: 'unless-stopped',
         healthcheck: {
-          test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health'],
+          // Node is always present in the backend image; wget/curl are not.
+          test: [
+            'CMD',
+            'node',
+            '-e',
+            "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          ],
           interval: '15s',
           timeout: '5s',
           retries: 5,
