@@ -39,9 +39,9 @@ export class Approval {
   @Column({ type: 'text', nullable: true })
   clientComment!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   respondedAt!: Date | null;
 }

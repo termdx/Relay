@@ -16,7 +16,8 @@ describe('buildComposeFile', () => {
   it('adds postgres + module services on the network, with a volume', () => {
     const compose = buildComposeFile(config, [projects]);
     expect(Object.keys(compose.services).sort()).toEqual(['backend', 'postgres']);
-    expect(compose.services.postgres?.image).toBe('postgres:16-alpine');
+    // pgvector image so the future knowledge base can store embeddings.
+    expect(compose.services.postgres?.image).toBe('pgvector/pgvector:pg16');
     expect(compose.services.backend?.depends_on).toContain('postgres');
     expect(compose.networks).toHaveProperty('relay');
     expect(compose.volumes).toHaveProperty('relay_pgdata');
