@@ -1,0 +1,77 @@
+import {
+  integrationManifestSchema,
+  type IntegrationManifest,
+} from '../schemas/integration';
+import { moduleManifestSchema, type ModuleManifest } from '../schemas/module';
+
+/**
+ * Built-in catalog of installable modules and integrations. Until a remote
+ * registry exists, `relay module add <id>` / `relay integration add <id>`
+ * install from here. Dependencies declared here drive resolution.
+ */
+const MODULES = {
+  projects: {
+    id: 'projects',
+    version: '0.1.0',
+    displayName: 'Projects',
+    description: 'Clients, projects, and members — the base record module.',
+    capabilities: { apiRoutes: true, storage: true },
+  },
+  meeting: {
+    id: 'meeting',
+    version: '0.1.0',
+    displayName: 'Meetings',
+    description: 'Meeting → approval → tasks loop.',
+    dependencies: ['projects'],
+    requiredIntegrations: ['github'],
+    requiredAiCapabilities: ['draft'],
+    capabilities: { apiRoutes: true, ai: true },
+  },
+  timeline: {
+    id: 'timeline',
+    version: '0.1.0',
+    displayName: 'Timeline',
+    description: 'Per-project activity timeline.',
+    dependencies: ['projects'],
+    capabilities: { apiRoutes: true },
+  },
+  knowledge: {
+    id: 'knowledge',
+    version: '0.1.0',
+    displayName: 'Knowledge',
+    description: 'Project knowledge index for client Q&A.',
+    dependencies: ['projects'],
+    requiredAiCapabilities: ['chat'],
+    capabilities: { apiRoutes: true, ai: true, storage: true },
+  },
+} as const;
+
+const INTEGRATIONS = {
+  github: {
+    id: 'github',
+    version: '0.1.0',
+    displayName: 'GitHub',
+    credentials: [{ name: 'token', secretRef: 'github.token', required: true }],
+    healthChecks: [
+      { name: 'api', type: 'http', target: 'https://api.github.com' },
+    ],
+  },
+  slack: {
+    id: 'slack',
+    version: '0.1.0',
+    displayName: 'Slack',
+    credentials: [{ name: 'token', secretRef: 'slack.token', required: true }],
+  },
+} as const;
+
+export const MODULE_CATALOG: Record<string, ModuleManifest> = Object.fromEntries(
+  Object.entries(MODULES).map(([id, raw]) => [id, moduleManifestSchema.parse(raw)]),
+);
+
+export const INTEGRATION_CATALOG: Record<string, IntegrationManifest> =
+  Object.fromEntries(
+    Object.entries(INTEGRATIONS).map(([id, raw]) => [
+      id,
+      integrationManifestSchema.parse(raw),
+    ]),
+  );

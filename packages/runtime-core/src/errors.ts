@@ -56,3 +56,33 @@ export class WorkspaceLockedError extends RuntimeError {
     );
   }
 }
+
+export class UnknownCatalogItemError extends RuntimeError {
+  constructor(kind: string, id: string) {
+    super(`Unknown ${kind} "${id}" — not in the catalog.`, 'UNKNOWN_CATALOG_ITEM');
+  }
+}
+
+export class CircularDependencyError extends RuntimeError {
+  constructor(readonly cycle: string[]) {
+    super(`Circular dependency: ${cycle.join(' -> ')}.`, 'CIRCULAR_DEPENDENCY');
+  }
+}
+
+export class HasDependentsError extends RuntimeError {
+  constructor(id: string, readonly dependents: string[]) {
+    super(
+      `Cannot remove "${id}" — required by: ${dependents.join(', ')}.`,
+      'HAS_DEPENDENTS',
+    );
+  }
+}
+
+export class UnmetDependenciesError extends RuntimeError {
+  constructor(id: string, readonly missing: string[]) {
+    super(
+      `"${id}" needs dependencies not installed: ${missing.join(', ')}. Re-run with dependency install enabled.`,
+      'UNMET_DEPENDENCIES',
+    );
+  }
+}

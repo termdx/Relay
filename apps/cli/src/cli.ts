@@ -2,6 +2,9 @@
 import { Command } from 'commander';
 import { registerAi } from './commands/ai';
 import { registerInit } from './commands/init';
+import { registerIntegration } from './commands/integration';
+import { registerModule } from './commands/module';
+import { registerValidate } from './commands/validate';
 
 const program = new Command();
 
@@ -20,5 +23,8 @@ program.hook('preAction', (thisCommand) => {
 
 registerInit(program);
 registerAi(program);
+registerModule(program);
+registerIntegration(program);
+registerValidate(program);
 
 program.parseAsync(process.argv);

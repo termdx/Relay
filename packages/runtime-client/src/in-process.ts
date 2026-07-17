@@ -1,7 +1,13 @@
-import { RuntimeEngine, type AiProviderManifest } from '@relay/runtime-core';
+import {
+  RuntimeEngine,
+  type AiProviderManifest,
+  type Diagnostic,
+} from '@relay/runtime-core';
 import type {
   AiApi,
   AiProviderSummary,
+  IntegrationsApi,
+  ModulesApi,
   RuntimeApi,
   WorkspaceApi,
   WorkspaceInfo,
@@ -83,5 +89,39 @@ export class InProcessClient implements RuntimeApi {
       const engine = await RuntimeEngine.open(cwd);
       return engine.ai.models(id);
     },
+  };
+
+  readonly modules: ModulesApi = {
+    catalog: async (cwd) => (await RuntimeEngine.open(cwd)).modules.catalogItems(),
+    list: async (cwd) => (await RuntimeEngine.open(cwd)).modules.list(),
+    info: async (cwd, id) => (await RuntimeEngine.open(cwd)).modules.info(id),
+    plan: async (cwd, id) => (await RuntimeEngine.open(cwd)).planModule(id),
+    add: async (cwd, id, withDependencies) =>
+      (await RuntimeEngine.open(cwd)).addModule(id, withDependencies),
+    remove: async (cwd, id) => {
+      const engine = await RuntimeEngine.open(cwd);
+      await engine.modules.remove(id);
+    },
+  };
+
+  readonly integrations: IntegrationsApi = {
+    catalog: async (cwd) =>
+      (await RuntimeEngine.open(cwd)).integrations.catalogItems(),
+    list: async (cwd) => (await RuntimeEngine.open(cwd)).integrations.list(),
+    info: async (cwd, id) =>
+      (await RuntimeEngine.open(cwd)).integrations.info(id),
+    add: async (cwd, id, credentials) =>
+      (await RuntimeEngine.open(cwd)).integrations.add(id, credentials),
+    remove: async (cwd, id) => {
+      const engine = await RuntimeEngine.open(cwd);
+      await engine.integrations.remove(id);
+    },
+    health: async (cwd, id) =>
+      (await RuntimeEngine.open(cwd)).integrations.health(id),
+  };
+
+  validate = async (cwd: string): Promise<Diagnostic[]> => {
+    const engine = await RuntimeEngine.open(cwd);
+    return engine.validate();
   };
 }

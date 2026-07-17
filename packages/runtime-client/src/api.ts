@@ -60,7 +60,40 @@ export interface AiApi {
   models(cwd: string, id: string): Promise<string[]>;
 }
 
+import type {
+  Diagnostic,
+  InstallPlan,
+  IntegrationHealth,
+  IntegrationManifest,
+  ModuleManifest,
+} from '@relay/runtime-core';
+
+export interface ModulesApi {
+  catalog(cwd: string): Promise<ModuleManifest[]>;
+  list(cwd: string): Promise<ModuleManifest[]>;
+  info(cwd: string, id: string): Promise<ModuleManifest>;
+  plan(cwd: string, id: string): Promise<InstallPlan>;
+  add(cwd: string, id: string, withDependencies: boolean): Promise<InstallPlan>;
+  remove(cwd: string, id: string): Promise<void>;
+}
+
+export interface IntegrationsApi {
+  catalog(cwd: string): Promise<IntegrationManifest[]>;
+  list(cwd: string): Promise<IntegrationManifest[]>;
+  info(cwd: string, id: string): Promise<IntegrationManifest>;
+  add(
+    cwd: string,
+    id: string,
+    credentials: Record<string, string>,
+  ): Promise<IntegrationManifest>;
+  remove(cwd: string, id: string): Promise<void>;
+  health(cwd: string, id: string): Promise<IntegrationHealth>;
+}
+
 export interface RuntimeApi {
   workspace: WorkspaceApi;
   ai: AiApi;
+  modules: ModulesApi;
+  integrations: IntegrationsApi;
+  validate(cwd: string): Promise<Diagnostic[]>;
 }
