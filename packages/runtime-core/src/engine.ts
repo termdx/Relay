@@ -211,6 +211,12 @@ export class RuntimeEngine {
         randomBytes(18).toString('base64url'),
       );
     }
+    if (modules.some((m) => m.capabilities.apiRoutes)) {
+      // Signing key for desktop sessions — generated once, kept in secrets.
+      env.JWT_SECRET = await this.ensureSecret('backend.jwtSecret', () =>
+        randomBytes(32).toString('base64url'),
+      );
+    }
     const provider = defaultProvider(providers);
     const apiKey = provider ? await this.ai.resolveApiKey(provider) : undefined;
     Object.assign(env, aiProviderEnv(provider, apiKey));

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Header, Param, Post } from '@nestjs/common';
+import { Public } from '../auth/public.decorator';
 import { renderApprovalPage } from './approval-page';
 import { ApprovalService } from './approval.service';
 import { RespondApprovalDto } from './dto/respond-approval.dto';
@@ -7,7 +8,11 @@ import { RespondApprovalDto } from './dto/respond-approval.dto';
  * Public, unauthenticated endpoints — the magic-link token IS the credential.
  * Serves the client's approval page and records their decision. No account,
  * no login, no install (the deliberate answer to the client cold-start).
+ *
+ * @Public() is load-bearing here: the global JwtAuthGuard would otherwise lock
+ * clients out of the one page the whole product depends on them opening.
  */
+@Public()
 @Controller('approve')
 export class ApprovalController {
   constructor(private readonly approvals: ApprovalService) {}

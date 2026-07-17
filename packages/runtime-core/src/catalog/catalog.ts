@@ -25,6 +25,7 @@ const MODULES = {
           PORT: '3000',
           DATABASE_URL:
             'postgresql://relay:${POSTGRES_PASSWORD}@postgres:5432/relay',
+          JWT_SECRET: '${JWT_SECRET}',
           AI_PROVIDER: '${AI_PROVIDER}',
           GEMINI_API_KEY: '${GEMINI_API_KEY}',
           GEMINI_MODEL: '${GEMINI_MODEL}',
