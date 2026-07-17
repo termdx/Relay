@@ -72,6 +72,17 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
+      # These jobs run static Rust checks only (fmt/clippy/check), not a real
+      # bundle. Tauri's build script still validates that the sidecar declared
+      # in `externalBin` exists for the host triple, so stand in a placeholder.
+      # The real binary is compiled by scripts/build-sidecar.mjs at package time.
+      - name: Stub sidecar binary for build-script validation
+        run: |
+          triple="$(rustc -vV | sed -n 's/^host: //p')"
+          mkdir -p binaries
+          touch "binaries/relay-runtime-${triple}"
+          chmod +x "binaries/relay-runtime-${triple}"
+
       - name: Check formatting
         run: cargo fmt --all --check
 
