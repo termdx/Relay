@@ -5,6 +5,7 @@ export * from './manifest/manifest-store';
 export * from './workspace/paths';
 export * from './workspace/lock';
 export * from './workspace/workspace-service';
+export * from './workspace/default-workspace';
 export * from './secrets/secrets-provider';
 export * from './secrets/env-file-secrets';
 export * from './util/fs';

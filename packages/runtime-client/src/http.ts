@@ -48,6 +48,10 @@ export class HttpClient implements RuntimeApi {
   readonly workspace: WorkspaceApi = {
     init: (input) => this.rpc(['workspace', 'init'], [input]),
     info: (cwd) => this.rpc(['workspace', 'info'], [cwd]),
+    list: () => this.rpc(['workspace', 'list'], []),
+    create: (name, organization) =>
+      this.rpc(['workspace', 'create'], [name, organization]),
+    default: () => this.rpc(['workspace', 'default'], []),
   };
 
   readonly ai: AiApi = {

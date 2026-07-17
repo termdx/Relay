@@ -18,6 +18,7 @@
   "dependencies": {
     "@fastify/cors": "^11.3.0",
     "@relay/runtime-client": "workspace:*",
+    "@relay/runtime-core": "workspace:*",
     "fastify": "^5.2.0"
   },
   "devDependencies": {

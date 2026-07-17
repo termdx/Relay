@@ -25,6 +25,12 @@ export interface WorkspaceInfo {
 export interface WorkspaceApi {
   init(input: WorkspaceInitInput): Promise<WorkspaceInfo>;
   info(cwd: string): Promise<WorkspaceInfo>;
+  /** Workspaces under the well-known home ($HOME/.relay/workspaces). */
+  list(): Promise<WorkspaceSummary[]>;
+  /** Create a named workspace under the workspaces home. */
+  create(name: string, organization: string): Promise<WorkspaceSummary>;
+  /** The workspace the daemon serves by default. */
+  default(): Promise<string>;
 }
 
 export interface AiAddInput {
@@ -75,7 +81,10 @@ import type {
   RuntimeHealth,
   ServiceStatus,
   WorkflowManifest,
+  WorkspaceSummary,
 } from '@relay/runtime-core';
+
+export type { WorkspaceSummary };
 
 export interface ModulesApi {
   catalog(cwd: string): Promise<ModuleManifest[]>;

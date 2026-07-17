@@ -1,6 +1,10 @@
 import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { InProcessClient } from '@relay/runtime-client';
+import {
+  defaultWorkspaceRoot,
+  ensureDefaultWorkspace,
+} from '@relay/runtime-core';
 
 /**
  * Origins allowed to call the daemon from a browser context: the desktop app
@@ -67,10 +71,13 @@ export function buildServer(): FastifyInstance {
     methods: ['GET', 'POST', 'OPTIONS'],
   });
 
+  // Clients read `workspace` from here rather than sending a relative path —
+  // the daemon owns a well-known location, not whatever cwd it was started in.
   app.get('/health', () => ({
     status: 'ok',
     name: 'relay-runtime',
     version: '0.1.0',
+    workspace: defaultWorkspaceRoot(),
   }));
 
   app.post('/rpc', async (request, reply) => {
@@ -115,6 +122,13 @@ export function buildServer(): FastifyInstance {
 }
 
 export async function startRuntimeServer(port: number): Promise<FastifyInstance> {
+  // Guarantee there is always a workspace to serve, so a fresh install needs
+  // no `relay init` before the desktop works.
+  const { root, created } = await ensureDefaultWorkspace();
+  console.log(
+    `${created ? 'created' : 'using'} default workspace: ${root}`,
+  );
+
   const app = buildServer();
   await app.listen({ host: '127.0.0.1', port });
   return app;

@@ -1,5 +1,8 @@
 import {
   RuntimeEngine,
+  createWorkspace,
+  defaultWorkspaceRoot,
+  listWorkspaces,
   type AiProviderManifest,
   type Diagnostic,
 } from '@relay/runtime-core';
@@ -59,6 +62,9 @@ export class InProcessClient implements RuntimeApi {
       const engine = await RuntimeEngine.open(cwd);
       return toInfo(engine);
     },
+    list: () => listWorkspaces(),
+    create: (name, organization) => createWorkspace(name, organization),
+    default: () => Promise.resolve(defaultWorkspaceRoot()),
   };
 
   readonly ai: AiApi = {

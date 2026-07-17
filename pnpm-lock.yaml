@@ -267,6 +267,9 @@ importers:
       '@relay/runtime-client':
         specifier: workspace:*
         version: link:../../packages/runtime-client
+      '@relay/runtime-core':
+        specifier: workspace:*
+        version: link:../../packages/runtime-core
       fastify:
         specifier: ^5.2.0
         version: 5.10.0
