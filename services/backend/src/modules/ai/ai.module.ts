@@ -1,14 +1,45 @@
-import { Module } from '@nestjs/common';
-import { DRAFT_GENERATOR } from './draft-generator';
+import { Logger, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DRAFT_GENERATOR, type DraftGenerator } from './draft-generator';
+import { GeminiDraftGenerator } from './gemini-draft-generator';
 import { StubDraftGenerator } from './stub-draft-generator';
 
 /**
- * AI module — owns the AI seam. Binds the `DRAFT_GENERATOR` token to a concrete
- * implementation. Swap the implementation here (Ollama / hosted provider)
- * without touching any consumer.
+ * AI module — owns the AI seam. The concrete DraftGenerator is chosen by the
+ * AI_PROVIDER config value (the honest v0.1 form of `ai.md`'s gateway: one
+ * stable contract, config-selected implementation, no consumer changes).
+ *
+ *   AI_PROVIDER=stub    -> deterministic placeholder (default, no network)
+ *   AI_PROVIDER=gemini  -> Google Gemini (requires GEMINI_API_KEY)
  */
 @Module({
-  providers: [{ provide: DRAFT_GENERATOR, useClass: StubDraftGenerator }],
+  providers: [
+    {
+      provide: DRAFT_GENERATOR,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): DraftGenerator => {
+        const logger = new Logger('AiModule');
+        const provider = config
+          .get<string>('AI_PROVIDER', 'stub')
+          .toLowerCase();
+
+        if (provider === 'gemini') {
+          const apiKey = config.get<string>('GEMINI_API_KEY');
+          if (!apiKey) {
+            throw new Error(
+              'AI_PROVIDER=gemini but GEMINI_API_KEY is not set.',
+            );
+          }
+          const model = config.get<string>('GEMINI_MODEL', 'gemini-2.5-flash');
+          logger.log(`DraftGenerator: Gemini (${model})`);
+          return new GeminiDraftGenerator(apiKey, model);
+        }
+
+        logger.log('DraftGenerator: stub (placeholder output)');
+        return new StubDraftGenerator();
+      },
+    },
+  ],
   exports: [DRAFT_GENERATOR],
 })
 export class AiModule {}
