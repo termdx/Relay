@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { Command } from 'commander';
 import * as p from '@clack/prompts';
 import { ensure, getClient, run } from '../context';
@@ -59,7 +60,9 @@ export function registerInit(program: Command): void {
         const resolvedMode = (mode ?? 'local') as 'local' | 'server';
 
         const info = await client.workspace.init({
-          dir: options.dir,
+          // Resolve to absolute client-side: a relative dir sent to a running
+          // daemon would otherwise resolve against the daemon's cwd, not ours.
+          dir: resolve(options.dir),
           organization,
           mode: resolvedMode,
           desktop,
