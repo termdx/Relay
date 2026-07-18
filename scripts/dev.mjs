@@ -128,10 +128,10 @@ async function waitForDaemon() {
 async function runtimeOwned() {
   ensureDocker();
 
-  if (!silent(`docker image inspect ${BACKEND_IMAGE}`)) {
-    log(C.be, "backend", `building ${BACKEND_IMAGE} (first run, ~40s)…`);
-    loud(`docker build -t ${BACKEND_IMAGE} services/backend`);
-  }
+  // Always build: Docker's layer cache makes an unchanged build ~1s, and a
+  // stale image silently serves yesterday's backend (404s on new routes).
+  log(C.be, "backend", `building ${BACKEND_IMAGE} (cached when unchanged)…`);
+  loud(`docker build -t ${BACKEND_IMAGE} services/backend`);
 
   startDaemon();
   if (!(await waitForDaemon())) {
