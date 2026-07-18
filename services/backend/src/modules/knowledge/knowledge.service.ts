@@ -127,6 +127,23 @@ export class KnowledgeService {
     return { scanned: rows.length, added };
   }
 
+  /** Raw scoped retrieval — chunks only, no generation (agent tools use this). */
+  async retrieve(
+    projectId: string,
+    query: string,
+    limit = RETRIEVAL_LIMIT,
+  ): Promise<KnowledgeChunk[]> {
+    const [queryVector] = await this.embedder.embed([query]);
+    const distance = cosineDistance(knowledgeChunks.embedding, queryVector!);
+    const rows = await this.db
+      .select()
+      .from(knowledgeChunks)
+      .where(eq(knowledgeChunks.projectId, projectId))
+      .orderBy(distance)
+      .limit(limit);
+    return rows;
+  }
+
   /** Grounded Q&A over one project's knowledge. Scoping is the WHERE clause. */
   async ask(projectId: string, question: string): Promise<AskResult> {
     const [queryVector] = await this.embedder.embed([question]);

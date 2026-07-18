@@ -25,6 +25,18 @@ Anthropic, Ollama, OpenRouter, …) — each is a manifest plus an adapter per
 capability. A gateway (LiteLLM) may later slot in as a single adapter if
 provider sprawl warrants it; it is not a prerequisite.
 
+## Agents (executor)
+
+Agent definitions live in the runtime (agents/<id>.yaml); execution lives in
+the backend: a native function-calling loop (Gemini) over a closed tool
+registry — search_knowledge, list/create todos, record_decision,
+get_recent_activity — always scoped to one project, writes attributed with
+the `ai` actor. Runs are queued via the outbox and executed at-most-once
+(failures mark the run FAILED; side-effectful loops are never blind-retried).
+Workflows execute as sequential agent steps (definition.steps), each fed the
+previous step's output. The desktop Agents page runs them live with a tool
+trace. No agent framework — provider SDK tool-calling only.
+
 ## Rules
 
 - Every AI output that could reach a client is a **draft** attached to an

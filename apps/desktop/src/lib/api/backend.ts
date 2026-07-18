@@ -71,6 +71,22 @@ export const backend = {
         body: { question },
       }),
   },
+  agentRuns: {
+    create: (body: {
+      agentId: string;
+      agentName: string;
+      model: string;
+      tools?: string[];
+      projectId: string;
+      instruction: string;
+    }) =>
+      backendRequest<import("./types").AgentRun>("/agent-runs", {
+        method: "POST",
+        body,
+      }),
+    get: (id: string) =>
+      backendRequest<import("./types").AgentRun>(`/agent-runs/${id}`),
+  },
   branding: {
     get: () => backendRequest<import("./types").Branding>("/branding"),
     update: (body: Partial<import("./types").Branding>) =>

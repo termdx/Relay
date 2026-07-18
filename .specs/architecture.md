@@ -64,6 +64,7 @@ bundles the daemon as a sidecar. See `runtime.md`.
 | SMTP mailer + approval email (durable via outbox) | shipped |
 | Knowledge engine (embed/chat capabilities, ingest + reindex + scoped ask) | shipped |
 | Client portal (magic-link auth, dashboard, Relay AI chat, approvals) | shipped |
+| Agent/workflow executor (tool-calling loop over Relay data, via outbox) | shipped |
 | GitLab + Bitbucket (issues out, webhooks in) · Slack + Discord (notify out) | shipped |
 | Remaining adapters (Google Calendar, S3) | planned |
 | Temporal | planned — subsumes the outbox |

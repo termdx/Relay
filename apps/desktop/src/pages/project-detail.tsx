@@ -45,6 +45,7 @@ const EVENT_LABELS: Record<string, string> = {
   "todo.reopened": "Todo reopened",
   "decision.recorded": "Decision recorded",
   "notification.sent": "Client emailed",
+  "agent.run_completed": "Agent run completed",
   "github.push": "Commits pushed",
   "github.pr_opened": "PR opened",
   "github.pr_merged": "PR merged",

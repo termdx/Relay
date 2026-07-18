@@ -13,21 +13,28 @@ export class DecisionService {
     private readonly events: DomainEventBus,
   ) {}
 
-  async create(projectId: string, dto: CreateDecisionDto): Promise<Decision> {
+  async create(
+    projectId: string,
+    dto: CreateDecisionDto,
+    actor: { kind: 'user'; id: string } | { kind: 'ai'; id: string } = {
+      kind: 'user',
+      id: 'owner',
+    },
+  ): Promise<Decision> {
     const [decision] = await this.db
       .insert(decisions)
       .values({
         projectId,
         title: dto.title,
         detail: dto.detail ?? '',
-        decidedBy: 'owner',
+        decidedBy: actor.kind === 'ai' ? `agent:${actor.id}` : 'owner',
       })
       .returning();
 
     this.events.emit({
       type: DECISION_RECORDED,
       projectId,
-      actor: { kind: 'user', id: 'owner' },
+      actor,
       source: 'decision',
       payload: {
         decisionId: decision!.id,

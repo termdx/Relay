@@ -110,6 +110,22 @@ export interface Decision {
   createdAt: string;
 }
 
+export type AgentRunStatus = "QUEUED" | "RUNNING" | "DONE" | "FAILED";
+
+export interface AgentRun {
+  id: string;
+  agentId: string;
+  agentName: string;
+  model: string;
+  projectId: string;
+  instruction: string;
+  status: AgentRunStatus;
+  output: string | null;
+  trace: { tool: string; args: Record<string, unknown>; result: string }[];
+  error: string | null;
+  createdAt: string;
+}
+
 export interface Branding {
   agencyName: string | null;
   logo: string | null;

@@ -58,6 +58,10 @@ export function renderEvent(event: RenderableEvent): string | null {
     }
     case 'notification.sent':
       return line(`Client emailed: "${str(p.subject)}".`);
+    case 'agent.run_completed':
+      return line(
+        `Agent "${str(p.agentName)}" completed a run (${num(p.toolCalls) ?? 0} tool calls): ${str(p.instruction)}`,
+      );
     case 'github.push':
     case 'gitlab.push':
     case 'bitbucket.push':

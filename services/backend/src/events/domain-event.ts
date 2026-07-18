@@ -58,3 +58,4 @@ export const TODO_COMPLETED = 'todo.completed';
 export const TODO_REOPENED = 'todo.reopened';
 export const DECISION_RECORDED = 'decision.recorded';
 export const NOTIFICATION_SENT = 'notification.sent';
+export const AGENT_RUN_COMPLETED = 'agent.run_completed';

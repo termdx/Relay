@@ -8,6 +8,7 @@ import { DatabaseModule } from './database/database.module';
 import { EventsModule } from './events/events.module';
 import { AiModule } from './modules/ai/ai.module';
 import { ApprovalModule } from './modules/approval/approval.module';
+import { AgentModule } from './modules/agent/agent.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { BrandingModule } from './modules/branding/branding.module';
@@ -44,6 +45,7 @@ import { TodoModule } from './modules/todo/todo.module';
     NotificationModule,
     PortalModule,
     BrandingModule,
+    AgentModule,
     AiModule,
     GithubModule,
     ApprovalModule,

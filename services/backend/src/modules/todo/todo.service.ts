@@ -110,7 +110,14 @@ export class TodoService implements OnModuleInit {
     this.logger.log(`todo "${completed.title}" completed via GitHub issue close`);
   }
 
-  async create(projectId: string, dto: CreateTodoDto): Promise<Todo> {
+  async create(
+    projectId: string,
+    dto: CreateTodoDto,
+    actor: { kind: 'user'; id: string } | { kind: 'ai'; id: string } = {
+      kind: 'user',
+      id: 'owner',
+    },
+  ): Promise<Todo> {
     const [todo] = await this.db
       .insert(todos)
       .values({
@@ -120,7 +127,7 @@ export class TodoService implements OnModuleInit {
         assignee: dto.assignee ?? null,
       })
       .returning();
-    this.emitCreated(todo!, { kind: 'user', id: 'owner' });
+    this.emitCreated(todo!, actor);
     return todo!;
   }
 
@@ -160,7 +167,10 @@ export class TodoService implements OnModuleInit {
 
   private emitCreated(
     todo: Todo,
-    actor: { kind: 'user'; id: string } | { kind: 'client'; email: string },
+    actor:
+      | { kind: 'user'; id: string }
+      | { kind: 'client'; email: string }
+      | { kind: 'ai'; id: string },
   ): void {
     this.events.emit({
       type: TODO_CREATED,
