@@ -1,9 +1,15 @@
 import { backendRequest } from "./http";
 import type {
   AuthResult,
+  Client,
+  ClientWithProjects,
+  CreateClientInput,
   CreateMeetingInput,
+  CreateProjectInput,
   Meeting,
+  ProjectWithClient,
   PublicUser,
+  TimelineEvent,
   UpdateDraftInput,
 } from "./types";
 
@@ -25,6 +31,35 @@ export const backend = {
         auth: false,
       }),
     me: () => backendRequest<PublicUser>("/auth/me"),
+  },
+  clients: {
+    list: () => backendRequest<ClientWithProjects[]>("/clients"),
+    get: (id: string) => backendRequest<ClientWithProjects>(`/clients/${id}`),
+    create: (body: CreateClientInput) =>
+      backendRequest<Client>("/clients", { method: "POST", body }),
+    update: (id: string, body: Partial<CreateClientInput>) =>
+      backendRequest<ClientWithProjects>(`/clients/${id}`, {
+        method: "PATCH",
+        body,
+      }),
+  },
+  projects: {
+    list: () => backendRequest<ProjectWithClient[]>("/projects"),
+    get: (id: string) => backendRequest<ProjectWithClient>(`/projects/${id}`),
+    create: (body: CreateProjectInput) =>
+      backendRequest<ProjectWithClient>("/projects", { method: "POST", body }),
+    update: (
+      id: string,
+      body: Partial<Omit<CreateProjectInput, "clientId">> & {
+        status?: ProjectWithClient["status"];
+      },
+    ) =>
+      backendRequest<ProjectWithClient>(`/projects/${id}`, {
+        method: "PATCH",
+        body,
+      }),
+    timeline: (id: string) =>
+      backendRequest<TimelineEvent[]>(`/projects/${id}/timeline`),
   },
   meetings: {
     list: () => backendRequest<Meeting[]>("/meetings"),

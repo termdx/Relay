@@ -15,6 +15,65 @@ export interface AuthResult {
   user: PublicUser;
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  company: string | null;
+  email: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ProjectStatus = "ACTIVE" | "PAUSED" | "COMPLETED";
+
+export interface Project {
+  id: string;
+  clientId: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  githubRepo: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ClientWithProjects = Client & { projects: Project[] };
+export type ProjectWithClient = Project & { client: Client };
+
+export interface CreateClientInput {
+  name: string;
+  company?: string;
+  email: string;
+  notes?: string;
+}
+
+export interface CreateProjectInput {
+  clientId: string;
+  name: string;
+  description?: string;
+  githubRepo?: string;
+}
+
+export type TimelineActor =
+  | { kind: "user"; id: string }
+  | { kind: "client"; email: string }
+  | { kind: "integration"; id: string }
+  | { kind: "ai"; id: string }
+  | { kind: "system" };
+
+export interface TimelineEvent {
+  id: string;
+  projectId: string;
+  clientId: string | null;
+  type: string;
+  actor: TimelineActor;
+  payload: Record<string, unknown>;
+  source: string;
+  occurredAt: string;
+  recordedAt: string;
+}
+
 export type MeetingStatus =
   | "DRAFTED"
   | "PENDING_APPROVAL"
@@ -32,6 +91,7 @@ export interface MeetingTask {
 
 export interface Meeting {
   id: string;
+  projectId: string | null;
   title: string;
   transcript: string;
   clientEmail: string;
@@ -45,6 +105,7 @@ export interface Meeting {
 }
 
 export interface CreateMeetingInput {
+  projectId?: string;
   title: string;
   transcript: string;
   clientEmail: string;

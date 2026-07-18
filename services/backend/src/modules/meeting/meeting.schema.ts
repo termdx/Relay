@@ -1,5 +1,6 @@
 import { relations } from 'drizzle-orm';
 import { integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { projects } from '../project/project.schema';
 
 export type MeetingStatus =
   | 'DRAFTED'
@@ -9,10 +10,17 @@ export type MeetingStatus =
 
 export const meetings = pgTable('meetings', {
   id: uuid('id').primaryKey().defaultRandom(),
+  /** Attributes the meeting to a project (timeline, knowledge). Optional for
+   * pre-client-module meetings; becomes required once the desktop always
+   * creates meetings from a project. */
+  projectId: uuid('project_id').references(() => projects.id, {
+    onDelete: 'set null',
+  }),
   title: text('title').notNull(),
   transcript: text('transcript').notNull(),
   clientEmail: text('client_email').notNull(),
-  /** Target repo for pushed tasks, "owner/repo". Becomes a Project relation later. */
+  /** Target repo for pushed tasks, "owner/repo". Superseded by the project's
+   * githubRepo when projectId is set. */
   githubRepo: text('github_repo').notNull(),
   status: text('status').$type<MeetingStatus>().notNull().default('DRAFTED'),
   summary: text('summary'),

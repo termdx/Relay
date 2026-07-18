@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -7,6 +7,13 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { backend } from "@/lib/api/backend";
@@ -15,15 +22,32 @@ import { ApiError } from "@/lib/api/http";
 export function NewMeetingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [projectId, setProjectId] = React.useState("");
   const [title, setTitle] = React.useState("");
   const [clientEmail, setClientEmail] = React.useState("");
   const [githubRepo, setGithubRepo] = React.useState("");
   const [transcript, setTranscript] = React.useState("");
 
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: backend.projects.list,
+  });
+
+  /** Attribute the meeting to a project and its client/repo come for free. */
+  function onSelectProject(id: string) {
+    setProjectId(id);
+    const project = projects.data?.find((p) => p.id === id);
+    if (project) {
+      setClientEmail(project.client.email);
+      if (project.githubRepo) setGithubRepo(project.githubRepo);
+    }
+  }
+
   const create = useMutation({
     mutationFn: backend.meetings.create,
     onSuccess: (meeting) => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Draft generated");
       navigate(`/meetings/${meeting.id}`);
     },
@@ -33,7 +57,13 @@ export function NewMeetingPage() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    create.mutate({ title, clientEmail, githubRepo, transcript });
+    create.mutate({
+      projectId: projectId || undefined,
+      title,
+      clientEmail,
+      githubRepo,
+      transcript,
+    });
   }
 
   return (
@@ -53,6 +83,31 @@ export function NewMeetingPage() {
 
       <form onSubmit={onSubmit} className="mx-auto max-w-2xl px-8 py-6">
         <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Label>Project</Label>
+            <Select value={projectId} onValueChange={onSelectProject}>
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    projects.data && projects.data.length === 0
+                      ? "No projects yet — meeting won’t appear on a timeline"
+                      : "Attribute to a project (recommended)"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {(projects.data ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.client.name} — {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Fills the project timeline and prefills client + repo.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="title">Title</Label>

@@ -8,6 +8,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { asc, desc, eq } from 'drizzle-orm';
 import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
+import { DomainEventBus } from '../../events/domain-event-bus';
+import {
+  MEETING_APPROVED,
+  MEETING_CHANGES_REQUESTED,
+  MEETING_DRAFTED,
+  MEETING_SENT_FOR_APPROVAL,
+} from '../../events/domain-event';
 import { ApprovalService } from '../approval/approval.service';
 import { DRAFT_GENERATOR, type DraftGenerator } from '../ai/draft-generator';
 import {
@@ -41,6 +48,7 @@ export class MeetingService {
     private readonly issuePublisher: GithubIssuePublisher,
     private readonly approvals: ApprovalService,
     private readonly config: ConfigService,
+    private readonly events: DomainEventBus,
   ) {}
 
   /** Ingest a transcript, generate a draft, persist it for review. */
@@ -51,6 +59,7 @@ export class MeetingService {
       const [meeting] = await tx
         .insert(meetings)
         .values({
+          projectId: dto.projectId ?? null,
           title: dto.title,
           transcript: dto.transcript,
           clientEmail: dto.clientEmail,
@@ -74,7 +83,19 @@ export class MeetingService {
       return meeting!.id;
     });
 
-    return this.findOne(id);
+    const meeting = await this.findOne(id);
+    this.events.emit({
+      type: MEETING_DRAFTED,
+      projectId: meeting.projectId ?? undefined,
+      actor: { kind: 'ai', id: 'draft' },
+      source: 'meeting',
+      payload: {
+        meetingId: meeting.id,
+        title: meeting.title,
+        taskCount: meeting.tasks.length,
+      },
+    });
+    return meeting;
   }
 
   /** All meetings, newest activity first, for the desktop list. */
@@ -160,6 +181,14 @@ export class MeetingService {
       `Approval link for "${meeting.title}" (client ${meeting.clientEmail}): ${approvalUrl}`,
     );
 
+    this.events.emit({
+      type: MEETING_SENT_FOR_APPROVAL,
+      projectId: meeting.projectId ?? undefined,
+      actor: { kind: 'user', id: 'owner' },
+      source: 'meeting',
+      payload: { meetingId: meeting.id, title: meeting.title },
+    });
+
     return { meeting: await this.findOne(id), approvalUrl };
   }
 
@@ -182,6 +211,13 @@ export class MeetingService {
       this.logger.log(
         `Meeting ${meetingId} — client requested changes${comment ? `: "${comment}"` : ''}.`,
       );
+      this.events.emit({
+        type: MEETING_CHANGES_REQUESTED,
+        projectId: meeting.projectId ?? undefined,
+        actor: { kind: 'client', email: meeting.clientEmail },
+        source: 'meeting',
+        payload: { meetingId, title: meeting.title, comment },
+      });
       return;
     }
 
@@ -221,6 +257,19 @@ export class MeetingService {
     this.logger.log(
       `Meeting ${meetingId} approved — ${published.length} tasks pushed to ${meeting.githubRepo}.`,
     );
+
+    this.events.emit({
+      type: MEETING_APPROVED,
+      projectId: meeting.projectId ?? undefined,
+      actor: { kind: 'client', email: meeting.clientEmail },
+      source: 'meeting',
+      payload: {
+        meetingId,
+        title: meeting.title,
+        comment,
+        publishedIssues: published.map((issue) => issue.url),
+      },
+    });
   }
 
   private assertEditable(status: MeetingStatus): void {

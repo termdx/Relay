@@ -15,6 +15,13 @@
       "when": 1784285706072,
       "tag": "0001_exotic_sebastian_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784368883842,
+      "tag": "0002_silent_gladiator",
+      "breakpoints": true
     }
   ]
 }

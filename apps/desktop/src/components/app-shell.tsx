@@ -1,4 +1,4 @@
-import { LayoutGrid, LogOut, Server } from "lucide-react";
+import { LayoutGrid, LogOut, Server, Users } from "lucide-react";
 import * as React from "react";
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  { to: "/clients", label: "Clients", icon: Users, section: "Delivery" },
   { to: "/meetings", label: "Meetings", icon: LayoutGrid, section: "Delivery" },
   { to: "/runtime", label: "Runtime", icon: Server, section: "Workspace" },
 ];
