@@ -50,5 +50,12 @@ Shipped (v1) — `apps/portal`, a Vite/React SPA on the Relay design system:
 - **Approvals**: pending "waiting on you" inbox linking to the approval
   pages, plus decision history.
 
+- **Visibility controls**: what a client sees is the agency's call, per
+  project — toggles for analytics, feed (with or without raw code events),
+  deliverables, decisions, and the AI chat, set from the desktop project
+  page. Enforced server-side in the portal API (disabled section → 404),
+  never by UI hiding; the portal renders from the same resolved flags.
+  Approvals are not togglable — they're the core loop.
+
 Later: invited accounts, per-agency branding from workspace config, weekly
 digest opt-in.

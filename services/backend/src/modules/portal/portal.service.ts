@@ -10,7 +10,12 @@ import { clients, type Client } from '../client/client.schema';
 import { decisions, type Decision } from '../decision/decision.schema';
 import { KnowledgeService, type AskResult } from '../knowledge/knowledge.service';
 import { meetings } from '../meeting/meeting.schema';
-import { projects, type Project } from '../project/project.schema';
+import {
+  projects,
+  resolvePortalSettings,
+  type PortalSettings,
+  type Project,
+} from '../project/project.schema';
 import { timelineEvents, type TimelineEvent } from '../timeline/timeline.schema';
 import { todos, type Todo } from '../todo/todo.schema';
 
@@ -74,7 +79,10 @@ export class PortalService {
     private readonly knowledge: KnowledgeService,
   ) {}
 
-  async me(clientId: string): Promise<{ client: Client; projects: Project[] }> {
+  async me(clientId: string): Promise<{
+    client: Client;
+    projects: (Project & { portal: PortalSettings })[];
+  }> {
     const client = await this.db.query.clients.findFirst({
       where: eq(clients.id, clientId),
     });
@@ -83,23 +91,41 @@ export class PortalService {
       where: eq(projects.clientId, clientId),
       orderBy: [desc(projects.updatedAt)],
     });
-    return { client, projects: owned };
+    // Resolved settings ride along so the portal renders only what's allowed;
+    // the API endpoints below enforce the same flags regardless.
+    return {
+      client,
+      projects: owned.map((project) => ({
+        ...project,
+        portal: resolvePortalSettings(project.portalSettings),
+      })),
+    };
   }
 
-  /** Throws unless the project belongs to the authenticated client. */
+  /**
+   * Throws unless the project belongs to the authenticated client AND the
+   * requested portal section is enabled by the agency. Returns the resolved
+   * settings for finer filtering.
+   */
   private async assertOwnership(
     clientId: string,
     projectId: string,
-  ): Promise<void> {
+    section?: keyof PortalSettings,
+  ): Promise<PortalSettings> {
     const project = await this.db.query.projects.findFirst({
       where: and(eq(projects.id, projectId), eq(projects.clientId, clientId)),
-      columns: { id: true },
+      columns: { id: true, portalSettings: true },
     });
     if (!project) throw new NotFoundException('Project not found.');
+    const settings = resolvePortalSettings(project.portalSettings);
+    if (section && !settings[section]) {
+      throw new NotFoundException('Not available.');
+    }
+    return settings;
   }
 
   async overview(clientId: string, projectId: string): Promise<PortalOverview> {
-    await this.assertOwnership(clientId, projectId);
+    await this.assertOwnership(clientId, projectId, 'showAnalytics');
 
     const todoRows = await this.db
       .select({ status: todos.status, count: sql<number>`count(*)::int` })
@@ -164,11 +190,19 @@ export class PortalService {
   }
 
   async feed(clientId: string, projectId: string): Promise<TimelineEvent[]> {
-    await this.assertOwnership(clientId, projectId);
+    const settings = await this.assertOwnership(clientId, projectId, 'showFeed');
+    const allowed = settings.feedShowsCode
+      ? CLIENT_SAFE_EVENTS
+      : CLIENT_SAFE_EVENTS.filter(
+          (type) =>
+            !type.startsWith('github.') &&
+            !type.startsWith('gitlab.') &&
+            !type.startsWith('bitbucket.'),
+        );
     return this.db.query.timelineEvents.findMany({
       where: and(
         eq(timelineEvents.projectId, projectId),
-        inArray(timelineEvents.type, CLIENT_SAFE_EVENTS),
+        inArray(timelineEvents.type, allowed),
       ),
       orderBy: [desc(timelineEvents.occurredAt)],
       limit: 60,
@@ -176,7 +210,7 @@ export class PortalService {
   }
 
   async todosFor(clientId: string, projectId: string): Promise<Todo[]> {
-    await this.assertOwnership(clientId, projectId);
+    await this.assertOwnership(clientId, projectId, 'showTodos');
     return this.db.query.todos.findMany({
       where: eq(todos.projectId, projectId),
       orderBy: [desc(todos.updatedAt)],
@@ -185,7 +219,7 @@ export class PortalService {
   }
 
   async decisionsFor(clientId: string, projectId: string): Promise<Decision[]> {
-    await this.assertOwnership(clientId, projectId);
+    await this.assertOwnership(clientId, projectId, 'showDecisions');
     return this.db.query.decisions.findMany({
       where: eq(decisions.projectId, projectId),
       orderBy: [desc(decisions.createdAt)],
@@ -224,7 +258,7 @@ export class PortalService {
     projectId: string,
     question: string,
   ): Promise<AskResult> {
-    await this.assertOwnership(clientId, projectId);
+    await this.assertOwnership(clientId, projectId, 'showAsk');
     return this.knowledge.ask(projectId, question);
   }
 }

@@ -66,9 +66,25 @@ export class ProjectService {
   }
 
   async update(id: string, dto: UpdateProjectDto): Promise<ProjectWithClient> {
-    await this.findOne(id);
-    if (Object.keys(dto).length > 0) {
-      await this.db.update(projects).set(dto).where(eq(projects.id, id));
+    const existing = await this.findOne(id);
+    const { portalSettings, ...rest } = dto;
+    const changes: Record<string, unknown> = { ...rest };
+    if (portalSettings) {
+      // Merge sparse overrides so a single-toggle PATCH keeps the others.
+      // The DTO is a class instance: unset fields exist as undefined (ES2022
+      // class fields) and would clobber stored values if spread naively.
+      const overrides = Object.fromEntries(
+        Object.entries({ ...portalSettings }).filter(
+          ([, value]) => value !== undefined,
+        ),
+      );
+      changes.portalSettings = {
+        ...(existing.portalSettings ?? {}),
+        ...overrides,
+      };
+    }
+    if (Object.keys(changes).length > 0) {
+      await this.db.update(projects).set(changes).where(eq(projects.id, id));
     }
     return this.findOne(id);
   }

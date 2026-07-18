@@ -55,12 +55,23 @@ export interface PortalClientInfo {
   email: string;
 }
 
+export interface PortalVisibility {
+  showAnalytics: boolean;
+  showFeed: boolean;
+  feedShowsCode: boolean;
+  showTodos: boolean;
+  showDecisions: boolean;
+  showAsk: boolean;
+}
+
 export interface PortalProject {
   id: string;
   name: string;
   description: string | null;
   status: "ACTIVE" | "PAUSED" | "COMPLETED";
   githubRepo: string | null;
+  /** What the agency chose to show — the API enforces the same flags. */
+  portal: PortalVisibility;
 }
 
 export interface PortalOverview {

@@ -6,6 +6,7 @@ import {
   Check,
   CircleUser,
   ExternalLink,
+  Eye,
   Gavel,
   Plug,
   Plus,
@@ -24,7 +25,13 @@ import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
 import { openExternal } from "@/lib/open";
 import { cn } from "@/lib/utils";
-import type { TimelineActor, TimelineEvent, Todo } from "@/lib/api/types";
+import type {
+  PortalSettings,
+  ProjectWithClient,
+  TimelineActor,
+  TimelineEvent,
+  Todo,
+} from "@/lib/api/types";
 
 /** Human labels for known event types; unknown types fall back to the raw name. */
 const EVENT_LABELS: Record<string, string> = {
@@ -143,6 +150,8 @@ export function ProjectDetailPage() {
 
         <AskSection projectId={p.id} />
 
+        <PortalSettingsCard project={p} />
+
         <div className="mb-8 grid gap-8 lg:grid-cols-2">
           <TodosSection projectId={p.id} />
           <DecisionsSection projectId={p.id} />
@@ -235,6 +244,89 @@ function AskSection({ projectId }: { projectId: string }) {
           ) : null}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+const PORTAL_TOGGLES: {
+  key: keyof PortalSettings;
+  label: string;
+  hint: string;
+}[] = [
+  { key: "showAnalytics", label: "Analytics", hint: "progress, stats, activity chart" },
+  { key: "showFeed", label: "Activity feed", hint: "the project timeline" },
+  { key: "feedShowsCode", label: "Code events in feed", hint: "pushes, PRs, issues" },
+  { key: "showTodos", label: "Deliverables", hint: "the todo list" },
+  { key: "showDecisions", label: "Decisions", hint: "the decisions log" },
+  { key: "showAsk", label: "Relay AI chat", hint: "grounded Q&A" },
+];
+
+const DEFAULT_PORTAL: PortalSettings = {
+  showAnalytics: true,
+  showFeed: true,
+  feedShowsCode: true,
+  showTodos: true,
+  showDecisions: true,
+  showAsk: true,
+};
+
+/** What this project's client can see — enforced server-side on the portal API. */
+function PortalSettingsCard({ project }: { project: ProjectWithClient }) {
+  const queryClient = useQueryClient();
+  const effective: PortalSettings = {
+    ...DEFAULT_PORTAL,
+    ...(project.portalSettings ?? {}),
+  };
+
+  const update = useMutation({
+    mutationFn: (patch: Partial<PortalSettings>) =>
+      backend.projects.update(project.id, { portalSettings: patch }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", project.id] });
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not update portal settings",
+      ),
+  });
+
+  return (
+    <section className="mb-8 rounded-lg border border-border bg-card p-4">
+      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <Eye className="size-4" />
+        Client portal
+        <span className="ml-auto text-[11px] font-normal normal-case tracking-normal">
+          what {project.client.name} sees — approvals are always on
+        </span>
+      </h2>
+      <div className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+        {PORTAL_TOGGLES.map((toggle) => {
+          const on = effective[toggle.key];
+          const disabled =
+            toggle.key === "feedShowsCode" && !effective.showFeed;
+          return (
+            <label
+              key={toggle.key}
+              className={cn(
+                "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/40",
+                disabled && "pointer-events-none opacity-40",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={update.isPending || disabled}
+                onChange={() => update.mutate({ [toggle.key]: !on })}
+                className="size-4 accent-[var(--primary)]"
+              />
+              <span className="text-sm">{toggle.label}</span>
+              <span className="ml-auto text-[11px] text-muted-foreground">
+                {toggle.hint}
+              </span>
+            </label>
+          );
+        })}
+      </div>
     </section>
   );
 }

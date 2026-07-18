@@ -27,6 +27,15 @@ export interface Client {
 
 export type ProjectStatus = "ACTIVE" | "PAUSED" | "COMPLETED";
 
+export interface PortalSettings {
+  showAnalytics: boolean;
+  showFeed: boolean;
+  feedShowsCode: boolean;
+  showTodos: boolean;
+  showDecisions: boolean;
+  showAsk: boolean;
+}
+
 export interface Project {
   id: string;
   clientId: string;
@@ -34,6 +43,7 @@ export interface Project {
   description: string | null;
   status: ProjectStatus;
   githubRepo: string | null;
+  portalSettings: Partial<PortalSettings> | null;
   createdAt: string;
   updatedAt: string;
 }

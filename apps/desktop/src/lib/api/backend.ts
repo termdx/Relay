@@ -56,6 +56,7 @@ export const backend = {
       id: string,
       body: Partial<Omit<CreateProjectInput, "clientId">> & {
         status?: ProjectWithClient["status"];
+        portalSettings?: Partial<import("./types").PortalSettings>;
       },
     ) =>
       backendRequest<ProjectWithClient>(`/projects/${id}`, {

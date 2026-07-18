@@ -25,6 +25,7 @@ import {
   type AskResult,
   type FeedEvent,
   type PortalProject,
+  type PortalVisibility,
 } from "./api";
 
 const AGENCY_NAME: string =
@@ -145,6 +146,11 @@ function Portal() {
   const active =
     projects.find((p) => p.id === projectId) ?? projects[0] ?? null;
 
+  // Never leave the client on a tab the agency turned off.
+  React.useEffect(() => {
+    if (tab === "ask" && active && !active.portal.showAsk) setTab("overview");
+  }, [tab, active]);
+
   if (me.isLoading) {
     return <Centered><p className="text-sm text-muted-foreground">Loading…</p></Centered>;
   }
@@ -204,7 +210,7 @@ function Portal() {
             {(
               [
                 ["overview", "Overview"],
-                ["ask", "Ask"],
+                ...(active.portal.showAsk ? [["ask", "Ask"] as [Tab, string]] : []),
                 ["approvals", "Approvals"],
               ] as [Tab, string][]
             ).map(([key, label]) => (
@@ -223,8 +229,12 @@ function Portal() {
             ))}
           </nav>
 
-          {tab === "overview" && <Overview projectId={active.id} />}
-          {tab === "ask" && <Ask projectId={active.id} />}
+          {tab === "overview" && (
+            <Overview projectId={active.id} visibility={active.portal} />
+          )}
+          {tab === "ask" && active.portal.showAsk && (
+            <Ask projectId={active.id} />
+          )}
           {tab === "approvals" && <Approvals />}
         </>
       ) : (
@@ -277,22 +287,32 @@ function PoweredBy({ className = "" }: { className?: string }) {
 
 /* ── overview: analytics + feed + todos + decisions ─────────────────────── */
 
-function Overview({ projectId }: { projectId: string }) {
+function Overview({
+  projectId,
+  visibility,
+}: {
+  projectId: string;
+  visibility: PortalVisibility;
+}) {
   const overview = useQuery({
     queryKey: ["overview", projectId],
     queryFn: () => portal.overview(projectId),
+    enabled: visibility.showAnalytics,
   });
   const feed = useQuery({
     queryKey: ["feed", projectId],
     queryFn: () => portal.feed(projectId),
+    enabled: visibility.showFeed,
   });
   const todos = useQuery({
     queryKey: ["todos", projectId],
     queryFn: () => portal.todos(projectId),
+    enabled: visibility.showTodos,
   });
   const decisions = useQuery({
     queryKey: ["decisions", projectId],
     queryFn: () => portal.decisions(projectId),
+    enabled: visibility.showDecisions,
   });
 
   const o = overview.data;
@@ -301,6 +321,7 @@ function Overview({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {visibility.showAnalytics && (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label="Progress"
@@ -327,13 +348,17 @@ function Overview({ projectId }: { projectId: string }) {
           icon={GitPullRequest}
         />
       </div>
+      )}
 
+      {visibility.showAnalytics && (
       <section className="rounded-lg border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Activity — last 8 weeks</h2>
         <ActivityChart weeks={o?.weeklyActivity ?? []} />
       </section>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
+        {visibility.showTodos && (
         <section>
           <h2 className="mb-2.5 text-sm font-semibold">Deliverables</h2>
           {todos.data && todos.data.length > 0 ? (
@@ -358,7 +383,9 @@ function Overview({ projectId }: { projectId: string }) {
             <EmptyNote>Deliverables appear here as work is agreed.</EmptyNote>
           )}
         </section>
+        )}
 
+        {visibility.showDecisions && (
         <section>
           <h2 className="mb-2.5 text-sm font-semibold">Decisions</h2>
           {decisions.data && decisions.data.length > 0 ? (
@@ -382,8 +409,10 @@ function Overview({ projectId }: { projectId: string }) {
             <EmptyNote>Key decisions and their reasoning land here.</EmptyNote>
           )}
         </section>
+        )}
       </div>
 
+      {visibility.showFeed && (
       <section>
         <h2 className="mb-2.5 text-sm font-semibold">Recent activity</h2>
         {feed.data && feed.data.length > 0 ? (
@@ -396,6 +425,7 @@ function Overview({ projectId }: { projectId: string }) {
           <EmptyNote>Project activity shows up here automatically.</EmptyNote>
         )}
       </section>
+      )}
     </div>
   );
 }
