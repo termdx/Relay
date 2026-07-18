@@ -14,6 +14,7 @@ import { inspectHealth, type RuntimeHealth } from './health/health-monitor';
 import { ServiceLifecycle } from './lifecycle/service-lifecycle';
 import { ManifestStore } from './manifest/manifest-store';
 import {
+  DEFAULT_GITHUB_CLIENT_ID,
   pollGithubDeviceFlow,
   startGithubDeviceFlow,
   type GithubDeviceStart,
@@ -187,14 +188,8 @@ export class RuntimeEngine {
     const resolved =
       clientId?.trim() ||
       (await this.secrets.get('github.clientId')) ||
-      process.env.RELAY_GITHUB_CLIENT_ID;
-    if (!resolved) {
-      throw new Error(
-        'No GitHub OAuth client id configured. Create a GitHub OAuth app ' +
-          '(any callback URL, "Enable Device Flow" checked) and paste its ' +
-          'client id — Relay remembers it after the first connect.',
-      );
-    }
+      process.env.RELAY_GITHUB_CLIENT_ID ||
+      DEFAULT_GITHUB_CLIENT_ID;
     const flow = await startGithubDeviceFlow(resolved);
     await this.secrets.set('github.clientId', resolved);
     return flow;

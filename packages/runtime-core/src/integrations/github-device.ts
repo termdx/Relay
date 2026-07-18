@@ -24,6 +24,14 @@ export type GithubDevicePoll =
   | { status: 'complete'; token: string }
   | { status: 'error'; message: string };
 
+/**
+ * Relay's registered GitHub OAuth app ("Relay", device flow enabled). A
+ * client id is public by design (RFC 8628 public client) — safe to ship.
+ * Self-hosters can override via the connect UI, secret github.clientId, or
+ * RELAY_GITHUB_CLIENT_ID.
+ */
+export const DEFAULT_GITHUB_CLIENT_ID = 'Ov23liHES7FSvppj94Ff';
+
 const DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 
