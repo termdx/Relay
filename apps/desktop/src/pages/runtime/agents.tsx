@@ -73,6 +73,7 @@ export function RuntimeAgentsPage() {
     toast.loading(`${agent.name} is working…`, {
       id: `agent-${agent.id}`,
       position: "top-center",
+      description: "starting runs…",
     });
     try {
       const runs = await Promise.all(
@@ -315,11 +316,13 @@ function AgentRunWatcher({
         if (!settled) {
           const doneCount = results.filter((r) => r.status === "DONE").length;
           const toolCalls = results.reduce((n, r) => n + r.trace.length, 0);
-          toast.loading(
-            `${agent.name} is working… ${doneCount}/${runs.length} projects` +
+          toast.loading(`${agent.name} is working…`, {
+            id: toastId,
+            position: "top-center",
+            description:
+              `${doneCount}/${runs.length} project(s)` +
               (toolCalls > 0 ? ` · ${toolCalls} tool call(s)` : ""),
-            { id: toastId, position: "top-center" },
-          );
+          });
           setTimeout(() => void tick(), 1500);
           return;
         }
