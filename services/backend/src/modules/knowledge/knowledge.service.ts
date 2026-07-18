@@ -171,18 +171,42 @@ export class KnowledgeService {
       ref: index + 1,
       text: chunk.content,
     }));
-    const grounded = await this.answerer.answer(question, context);
-    const cited = new Set(grounded.citedRefs);
 
-    return {
-      answer: grounded.answer,
-      sources: retrieved.map((chunk, index) => ({
-        ref: index + 1,
-        cited: cited.has(index + 1),
-        snippet: chunk.content,
-        type: chunk.sourceType,
-        occurredAt: chunk.occurredAt,
-      })),
-    };
+    // A model outage (rate limit, quota) must never 500 a client-facing
+    // chat: fall back to retrieval-only — the relevant history, honestly
+    // labeled, instead of an error page.
+    try {
+      const grounded = await this.answerer.answer(question, context);
+      const cited = new Set(grounded.citedRefs);
+      return {
+        answer: grounded.answer,
+        sources: retrieved.map((chunk, index) => ({
+          ref: index + 1,
+          cited: cited.has(index + 1),
+          snippet: chunk.content,
+          type: chunk.sourceType,
+          occurredAt: chunk.occurredAt,
+        })),
+      };
+    } catch (error) {
+      this.logger.warn(
+        `answerer unavailable, serving retrieval-only: ${
+          error instanceof Error ? error.message.slice(0, 200) : String(error)
+        }`,
+      );
+      return {
+        answer:
+          retrieved.length > 0
+            ? 'The assistant is briefly unavailable — here are the most relevant entries from the project history in the meantime:'
+            : 'The assistant is briefly unavailable, and the project history has nothing matching that yet. Please try again in a few minutes.',
+        sources: retrieved.map((chunk, index) => ({
+          ref: index + 1,
+          cited: true,
+          snippet: chunk.content,
+          type: chunk.sourceType,
+          occurredAt: chunk.occurredAt,
+        })),
+      };
+    }
   }
 }
