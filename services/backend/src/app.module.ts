@@ -17,6 +17,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { MeetingModule } from './modules/meeting/meeting.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
+import { PortalModule } from './modules/portal/portal.module';
 import { ProjectModule } from './modules/project/project.module';
 import { TimelineModule } from './modules/timeline/timeline.module';
 import { TodoModule } from './modules/todo/todo.module';
@@ -40,6 +41,7 @@ import { TodoModule } from './modules/todo/todo.module';
     DecisionModule,
     KnowledgeModule,
     NotificationModule,
+    PortalModule,
     AiModule,
     GithubModule,
     ApprovalModule,

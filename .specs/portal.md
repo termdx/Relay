@@ -35,6 +35,20 @@ portal API. Deployed alongside the backend on the agency's own infrastructure;
 
 ## Status
 
-Planned. Prerequisites: client/project entities, knowledge engine, `chat`
-capability. The approval page (backend-rendered magic-link) exists today and
-will be absorbed into the portal.
+Shipped (v1) — `apps/portal`, a Vite/React SPA on the Relay design system:
+
+- **Sign-in**: email → single-use 15-minute magic link → 30-day portal
+  session. Portal tokens are signed with a secret derived from JWT_SECRET, so
+  they can never pass the owner guard (separation by signature). Request
+  responses never reveal whether an email is a client.
+- **Overview**: analytics (progress %, commits/PRs/issues 30d, 8-week
+  activity chart), deliverables, decisions, client-safe activity feed
+  (event-type allowlist).
+- **Ask**: Relay AI chat grounded in the knowledge base, cited sources,
+  "Powered by Relay AI" badge. Scoping enforced by project-ownership check +
+  SQL WHERE.
+- **Approvals**: pending "waiting on you" inbox linking to the approval
+  pages, plus decision history.
+
+Later: invited accounts, per-agency branding from workspace config, weekly
+digest opt-in.

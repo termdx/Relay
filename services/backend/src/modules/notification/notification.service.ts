@@ -2,6 +2,10 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { DomainEventBus } from '../../events/domain-event-bus';
 import { NOTIFICATION_SENT } from '../../events/domain-event';
 import { OutboxService } from '../outbox/outbox.service';
+import {
+  PORTAL_LOGIN_EMAIL,
+  type PortalLoginEmailPayload,
+} from '../portal/portal-auth.service';
 import { MAILER, type Mailer } from './mailer';
 
 /** Outbox message type: a client should receive an approval request email. */
@@ -32,6 +36,26 @@ export class NotificationService implements OnModuleInit {
     this.outbox.register(APPROVAL_EMAIL_REQUESTED, async (payload) => {
       const email = payload as unknown as ApprovalEmailPayload;
       await this.sendApprovalEmail(email);
+    });
+    this.outbox.register(PORTAL_LOGIN_EMAIL, async (payload) => {
+      const login = payload as unknown as PortalLoginEmailPayload;
+      await this.mailer.send({
+        to: login.clientEmail,
+        subject: 'Your sign-in link',
+        text: [
+          `Hi ${login.clientName},`,
+          ``,
+          `Sign in to your project portal here (link valid for 15 minutes):`,
+          login.loginUrl,
+          ``,
+          `— sent by Relay`,
+        ].join('\n'),
+        html: [
+          `<p>Hi ${escapeHtml(login.clientName)},</p>`,
+          `<p><a href="${login.loginUrl}">Sign in to your project portal</a> (valid for 15 minutes).</p>`,
+          `<p style="color:#888">— sent by Relay</p>`,
+        ].join('\n'),
+      });
     });
   }
 

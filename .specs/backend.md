@@ -20,6 +20,7 @@ event-driven communication between them.
 | storage | File/image uploads to S3-compatible object storage | planned |
 | outbox | Transactional outbox: durable, retried external side effects | shipped |
 | integration/* | One adapter module per external tool, behind ports | github shipped |
+| portal | Client-scoped API + magic-link auth for the portal app | shipped |
 | ai | Capability ports (draft, chat, embed) + provider adapters | draft shipped |
 
 ## Rules

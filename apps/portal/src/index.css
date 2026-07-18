@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/*
+ * Portal theme = the Relay design system, client-facing. Same violet-tinted
+ * tokens as the desktop; dark follows the visitor's OS preference.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.99 0.005 310);
+  --foreground: oklch(0.22 0.04 295);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.04 295);
+  --primary: oklch(0.5 0.14 300);
+  --primary-foreground: oklch(0.98 0.01 310);
+  --muted: oklch(0.95 0.015 300);
+  --muted-foreground: oklch(0.52 0.03 300);
+  --accent: oklch(0.94 0.025 300);
+  --accent-foreground: oklch(0.32 0.06 295);
+  --destructive: oklch(0.58 0.22 20);
+  --success: oklch(0.6 0.15 150);
+  --warning: oklch(0.7 0.15 75);
+  --border: oklch(0.9 0.015 300);
+  --input: oklch(0.9 0.015 300);
+  --ring: oklch(0.5 0.14 300);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.18 0.025 290);
+    --foreground: oklch(0.93 0.012 300);
+    --card: oklch(0.22 0.028 290);
+    --card-foreground: oklch(0.93 0.012 300);
+    --primary: oklch(0.72 0.13 300);
+    --primary-foreground: oklch(0.2 0.04 295);
+    --muted: oklch(0.28 0.025 290);
+    --muted-foreground: oklch(0.68 0.025 300);
+    --accent: oklch(0.31 0.035 292);
+    --accent-foreground: oklch(0.93 0.012 300);
+    --destructive: oklch(0.65 0.2 22);
+    --success: oklch(0.72 0.16 155);
+    --warning: oklch(0.78 0.15 78);
+    --border: oklch(0.3 0.025 290);
+    --input: oklch(0.32 0.028 290);
+    --ring: oklch(0.72 0.13 300);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

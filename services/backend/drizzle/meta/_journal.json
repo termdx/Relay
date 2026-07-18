@@ -43,6 +43,13 @@
       "when": 1784382427593,
       "tag": "0005_next_miek",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784383234864,
+      "tag": "0006_minor_puppet_master",
+      "breakpoints": true
     }
   ]
 }
