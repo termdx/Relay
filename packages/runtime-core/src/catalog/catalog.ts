@@ -32,6 +32,8 @@ const MODULES = {
           // Integration credentials, resolved from the secret store at
           // generate time; ':-' keeps compose quiet when not installed.
           GITHUB_TOKEN: '${GITHUB_TOKEN:-}',
+          SMTP_URL: '${SMTP_URL:-}',
+          SMTP_FROM: '${SMTP_FROM:-}',
         },
         dependsOn: ['postgres'],
         restart: 'unless-stopped',
@@ -94,6 +96,17 @@ const INTEGRATIONS = {
     version: '0.1.0',
     displayName: 'Slack',
     credentials: [{ name: 'token', secretRef: 'slack.token', required: true }],
+  },
+  smtp: {
+    id: 'smtp',
+    version: '0.1.0',
+    displayName: 'Email (SMTP)',
+    description:
+      'Outbound email: approval requests, digests. URL form: smtp[s]://user:pass@host:port',
+    credentials: [
+      { name: 'url', secretRef: 'smtp.url', required: true },
+      { name: 'from', secretRef: 'smtp.from', required: false },
+    ],
   },
 } as const;
 

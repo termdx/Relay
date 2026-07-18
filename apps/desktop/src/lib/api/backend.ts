@@ -6,10 +6,13 @@ import type {
   CreateClientInput,
   CreateMeetingInput,
   CreateProjectInput,
+  Decision,
   Meeting,
   ProjectWithClient,
   PublicUser,
   TimelineEvent,
+  Todo,
+  TodoStatus,
   UpdateDraftInput,
 } from "./types";
 
@@ -60,6 +63,29 @@ export const backend = {
       }),
     timeline: (id: string) =>
       backendRequest<TimelineEvent[]>(`/projects/${id}/timeline`),
+  },
+  todos: {
+    list: (projectId: string) =>
+      backendRequest<Todo[]>(`/projects/${projectId}/todos`),
+    create: (projectId: string, body: { title: string; body?: string; assignee?: string }) =>
+      backendRequest<Todo>(`/projects/${projectId}/todos`, {
+        method: "POST",
+        body,
+      }),
+    setStatus: (id: string, status: TodoStatus) =>
+      backendRequest<Todo>(`/todos/${id}/status`, {
+        method: "PATCH",
+        body: { status },
+      }),
+  },
+  decisions: {
+    list: (projectId: string) =>
+      backendRequest<Decision[]>(`/projects/${projectId}/decisions`),
+    create: (projectId: string, body: { title: string; detail?: string }) =>
+      backendRequest<Decision>(`/projects/${projectId}/decisions`, {
+        method: "POST",
+        body,
+      }),
   },
   meetings: {
     list: () => backendRequest<Meeting[]>("/meetings"),

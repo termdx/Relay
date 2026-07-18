@@ -13,8 +13,8 @@ Core entities:
 | Client | The anchor: everything hangs off a client | next |
 | Project | Belongs to a client; links repos, channels, calendars | next |
 | TimelineEvent | Append-only; every tracked signal lands here | next |
-| Todo | Extracted or manual; per project; may map to external issues | planned |
-| Decision | First-class record: what was decided, when, by whom, source | planned |
+| Todo | Extracted or manual; per project; may map to external issues | shipped |
+| Decision | First-class record: what was decided, when, by whom, source | shipped |
 | Meeting / MeetingTask | Transcript, draft, tasks | shipped |
 | Approval | Frozen snapshot + token + decision | shipped |
 | KnowledgeChunk | Embedded content (pgvector) with source provenance | planned |

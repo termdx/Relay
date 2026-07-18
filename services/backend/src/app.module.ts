@@ -11,11 +11,14 @@ import { ApprovalModule } from './modules/approval/approval.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { ClientModule } from './modules/client/client.module';
+import { DecisionModule } from './modules/decision/decision.module';
 import { GithubModule } from './modules/integration/github/github.module';
 import { MeetingModule } from './modules/meeting/meeting.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { ProjectModule } from './modules/project/project.module';
 import { TimelineModule } from './modules/timeline/timeline.module';
+import { TodoModule } from './modules/todo/todo.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { TimelineModule } from './modules/timeline/timeline.module';
     ClientModule,
     ProjectModule,
     TimelineModule,
+    TodoModule,
+    DecisionModule,
+    NotificationModule,
     AiModule,
     GithubModule,
     ApprovalModule,

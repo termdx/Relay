@@ -1,7 +1,11 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
+import {
+  DRIZZLE,
+  type RelayDb,
+  type RelayTx,
+} from '../../database/drizzle.provider';
 import { OutboxService } from '../outbox/outbox.service';
 import { APPROVAL_DECIDED, type ApprovalDecidedEvent } from './approval.events';
 import {
@@ -20,12 +24,15 @@ export class ApprovalService {
     private readonly outbox: OutboxService,
   ) {}
 
-  /** Create a pending approval for a meeting and return it (token included). */
+  /** Create a pending approval for a meeting and return it (token included).
+   * Accepts the caller's transaction so approval + status + notification can
+   * commit atomically. */
   async createForMeeting(
     meetingId: string,
     payload: ApprovalPayload,
+    db: RelayDb | RelayTx = this.db,
   ): Promise<Approval> {
-    const [approval] = await this.db
+    const [approval] = await db
       .insert(approvals)
       .values({
         meetingId,

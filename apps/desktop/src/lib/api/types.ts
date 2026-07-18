@@ -74,6 +74,32 @@ export interface TimelineEvent {
   recordedAt: string;
 }
 
+export type TodoStatus = "OPEN" | "DONE";
+
+export interface Todo {
+  id: string;
+  projectId: string;
+  title: string;
+  body: string;
+  status: TodoStatus;
+  assignee: string | null;
+  source: "manual" | "meeting";
+  externalUrl: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Decision {
+  id: string;
+  projectId: string;
+  title: string;
+  detail: string;
+  decidedBy: string;
+  source: "manual" | "meeting" | "approval";
+  createdAt: string;
+}
+
 export type MeetingStatus =
   | "DRAFTED"
   | "PENDING_APPROVAL"

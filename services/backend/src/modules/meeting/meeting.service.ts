@@ -16,6 +16,8 @@ import {
   MEETING_SENT_FOR_APPROVAL,
 } from '../../events/domain-event';
 import { ApprovalService } from '../approval/approval.service';
+import { APPROVAL_EMAIL_REQUESTED } from '../notification/notification.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { DRAFT_GENERATOR, type DraftGenerator } from '../ai/draft-generator';
 import {
   GITHUB_ISSUE_PUBLISHER,
@@ -49,6 +51,7 @@ export class MeetingService {
     private readonly approvals: ApprovalService,
     private readonly config: ConfigService,
     private readonly events: DomainEventBus,
+    private readonly outbox: OutboxService,
   ) {}
 
   /** Ingest a transcript, generate a draft, persist it for review. */
@@ -154,29 +157,44 @@ export class MeetingService {
     const meeting = await this.findOne(id);
     this.assertEditable(meeting.status);
 
-    const approval = await this.approvals.createForMeeting(meeting.id, {
-      title: meeting.title,
-      summary: meeting.summary ?? '',
-      tasks: meeting.tasks.map((task) => ({
-        title: task.title,
-        body: task.body,
-        assignee: task.assignee,
-      })),
-    });
-
-    await this.db
-      .update(meetings)
-      .set({ status: 'PENDING_APPROVAL' })
-      .where(eq(meetings.id, id));
-
     const baseUrl = this.config.get<string>(
       'PUBLIC_BASE_URL',
       'http://localhost:3000',
     );
-    const approvalUrl = `${baseUrl}/approve/${approval.token}`;
 
-    // v0.1: no email yet — surface the link so the founder can send it.
-    // A NotificationModule will emit the email on `meeting.sent_for_approval`.
+    // Approval snapshot, status flip, and the client email are one
+    // transaction: the meeting can never be PENDING_APPROVAL without the
+    // email being owed (the outbox delivers it with retry).
+    const approvalUrl = await this.db.transaction(async (tx) => {
+      const approval = await this.approvals.createForMeeting(
+        meeting.id,
+        {
+          title: meeting.title,
+          summary: meeting.summary ?? '',
+          tasks: meeting.tasks.map((task) => ({
+            title: task.title,
+            body: task.body,
+            assignee: task.assignee,
+          })),
+        },
+        tx,
+      );
+      await tx
+        .update(meetings)
+        .set({ status: 'PENDING_APPROVAL' })
+        .where(eq(meetings.id, id));
+
+      const url = `${baseUrl}/approve/${approval.token}`;
+      await this.outbox.enqueue(tx, APPROVAL_EMAIL_REQUESTED, {
+        meetingId: meeting.id,
+        projectId: meeting.projectId,
+        clientEmail: meeting.clientEmail,
+        meetingTitle: meeting.title,
+        approvalUrl: url,
+      });
+      return url;
+    });
+
     this.logger.log(
       `Approval link for "${meeting.title}" (client ${meeting.clientEmail}): ${approvalUrl}`,
     );
@@ -236,6 +254,9 @@ export class MeetingService {
         assignee: task.assignee,
       })),
     );
+    const urlByTaskId = new Map(
+      unpublished.map((task, index) => [task.id, published[index]?.url ?? null]),
+    );
 
     await this.db.transaction(async (tx) => {
       await Promise.all(
@@ -252,6 +273,21 @@ export class MeetingService {
         .update(meetings)
         .set({ status: 'APPROVED', clientComment: comment })
         .where(eq(meetings.id, meetingId));
+      // Approved tasks become project todos — enqueued with the approval in
+      // one transaction, consumed durably by the todo module (idempotent via
+      // sourceRef, so outbox redelivery cannot duplicate).
+      await this.outbox.enqueue(tx, MEETING_APPROVED, {
+        meetingId,
+        projectId: meeting.projectId,
+        clientEmail: meeting.clientEmail,
+        tasks: meeting.tasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          body: task.body,
+          assignee: task.assignee,
+          url: task.githubIssueUrl ?? urlByTaskId.get(task.id) ?? null,
+        })),
+      });
     });
 
     this.logger.log(

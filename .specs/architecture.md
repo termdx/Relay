@@ -59,8 +59,9 @@ bundles the daemon as a sidecar. See `runtime.md`.
 | Client & project entities + event backbone + timeline | shipped |
 | Transactional outbox (durable external writes) | shipped |
 | GitHub adapter (real REST, token-selected; stub offline) | shipped |
-| Todos & decisions entities | next |
-| Remaining adapters (GitLab, Bitbucket, Slack, Discord, GCal, SMTP, S3) | planned |
+| Todos & decisions entities (meeting tasks sync into todos) | shipped |
+| SMTP mailer + approval email (durable via outbox) | shipped |
+| Remaining adapters (GitLab, Bitbucket, Slack, Discord, GCal, S3) | planned |
 | Knowledge engine | planned |
 | Client portal + Relay AI chat | planned |
 | Temporal | planned — subsumes the outbox |

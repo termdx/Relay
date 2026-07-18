@@ -13,8 +13,10 @@ event-driven communication between them.
 | timeline | Append-only event feed per project | next |
 | meeting | Transcript → AI draft → approval → tasks | shipped |
 | approval | Snapshot + magic-link decisions (generalizes beyond meetings) | shipped |
+| todo | Project todos — manual or synced from approved meetings | shipped |
+| decision | First-class decision records (what/who/when/source) | shipped |
 | knowledge | Ingestion + retrieval over pgvector; the source of truth | planned |
-| notification | Fan-out to Slack/Discord/email on events | planned |
+| notification | Outbound email via Mailer port (SMTP/stub); Slack/Discord later | email shipped |
 | storage | File/image uploads to S3-compatible object storage | planned |
 | outbox | Transactional outbox: durable, retried external side effects | shipped |
 | integration/* | One adapter module per external tool, behind ports | github shipped |

@@ -30,7 +30,7 @@ encrypted secret store; manifests and code never contain values.
 | Slack | both | notifications out; messages/decisions in | catalog entry only |
 | Discord | both | same as Slack | planned |
 | Google Calendar | both | milestones out; meetings in | planned |
-| SMTP | out | approval links, weekly digests, portal invites | planned |
+| SMTP | out | approval links, weekly digests, portal invites | adapter shipped (nodemailer, SMTP_URL-selected) |
 | Amazon S3 | out | images, attachments, recordings | planned |
 
 ## Rules
