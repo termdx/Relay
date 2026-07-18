@@ -21,7 +21,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <HashRouter>
           <App />
         </HashRouter>
-        <Toaster theme="dark" position="bottom-right" richColors />
+        {/* All toasts render as custom Relay cards (lib/toast) — the Toaster
+            only supplies placement and stacking. */}
+        <Toaster position="top-center" />
       </AuthProvider>
     </QueryClientProvider>
   </React.StrictMode>,
