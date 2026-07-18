@@ -795,6 +795,10 @@ function AgentDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Gemini only — agents need function calling. Other providers
+                power drafts, chat &amp; embeddings.
+              </p>
             </div>
           </div>
 

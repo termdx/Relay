@@ -252,6 +252,7 @@ function AddProviderDialog({
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
+              list={provider === "huggingface" ? "hf-model-suggestions" : undefined}
               placeholder={
                 provider === "gemini"
                   ? "gemini-flash-latest"
@@ -260,6 +261,22 @@ function AddProviderDialog({
                     : ""
               }
             />
+            {provider === "huggingface" && (
+              <>
+                <datalist id="hf-model-suggestions">
+                  <option value="meta-llama/Llama-3.3-70B-Instruct" />
+                  <option value="Qwen/Qwen2.5-72B-Instruct" />
+                  <option value="mistralai/Mistral-Small-24B-Instruct-2501" />
+                  <option value="deepseek-ai/DeepSeek-V3" />
+                  <option value="microsoft/phi-4" />
+                </datalist>
+                <p className="text-xs text-muted-foreground">
+                  The HF catalog is unbounded — type any hosted model id
+                  (suggestions above). Powers drafts, chat, and embeddings;
+                  agents still run on Gemini.
+                </p>
+              </>
+            )}
           </div>
           {needsKey && (
             <p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-[--color-warning]">
