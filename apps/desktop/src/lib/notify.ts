@@ -3,6 +3,17 @@
  * Permission is requested lazily on first use and cached.
  */
 
+const PREF_KEY = "relay-native-notifications";
+
+/** User preference (Settings → Notifications). Defaults to on. */
+export function nativeNotificationsEnabled(): boolean {
+  return localStorage.getItem(PREF_KEY) !== "off";
+}
+
+export function setNativeNotificationsEnabled(enabled: boolean): void {
+  localStorage.setItem(PREF_KEY, enabled ? "on" : "off");
+}
+
 let granted: boolean | null = null;
 
 async function ensurePermission(): Promise<boolean> {
@@ -21,6 +32,7 @@ async function ensurePermission(): Promise<boolean> {
 
 export async function nativeNotify(title: string, body?: string): Promise<void> {
   if (!("__TAURI_INTERNALS__" in window)) return; // web mode: in-app only
+  if (!nativeNotificationsEnabled()) return;
   try {
     if (!(await ensurePermission())) return;
     const { sendNotification } = await import("@tauri-apps/plugin-notification");

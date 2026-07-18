@@ -35,6 +35,8 @@ export const backend = {
         auth: false,
       }),
     me: () => backendRequest<PublicUser>("/auth/me"),
+    updateMe: (body: { name?: string; avatar?: string }) =>
+      backendRequest<PublicUser>("/auth/me", { method: "PATCH", body }),
   },
   clients: {
     list: () => backendRequest<ClientWithProjects[]>("/clients"),

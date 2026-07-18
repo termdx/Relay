@@ -71,6 +71,13 @@
       "when": 1784390105599,
       "tag": "0009_narrow_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784394398974,
+      "tag": "0010_steep_star_brand",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import { MeetingDetailPage } from "@/pages/meeting-detail";
 import { MeetingsPage } from "@/pages/meetings";
 import { NewMeetingPage } from "@/pages/new-meeting";
 import { ProjectDetailPage } from "@/pages/project-detail";
+import { SettingsPage } from "@/pages/settings";
 import { RuntimeAgentsPage } from "@/pages/runtime/agents";
 import { RuntimeAiPage } from "@/pages/runtime/ai";
 import { RuntimeIntegrationsPage } from "@/pages/runtime/integrations";
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/clients/:id" element={<ClientDetailPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/branding" element={<BrandingPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/meetings/new" element={<NewMeetingPage />} />
           <Route path="/meetings/:id" element={<MeetingDetailPage />} />

@@ -1,4 +1,4 @@
-import { LayoutGrid, LogOut, Palette, Server, Users } from "lucide-react";
+import { LayoutGrid, LogOut, Palette, Server, Settings, Users } from "lucide-react";
 import * as React from "react";
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ const NAV: NavItem[] = [
   { to: "/meetings", label: "Meetings", icon: LayoutGrid, section: "Delivery" },
   { to: "/branding", label: "Branding", icon: Palette, section: "Workspace" },
   { to: "/runtime", label: "Runtime", icon: Server, section: "Workspace" },
+  { to: "/settings", label: "Settings", icon: Settings, section: "Workspace" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -62,10 +63,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="border-t border-border p-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium">{user?.name}</div>
-              <div className="truncate text-xs text-muted-foreground">
-                {user?.email}
+            <div className="flex min-w-0 items-center gap-2.5">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt=""
+                  className="size-8 shrink-0 rounded-full border border-border object-cover"
+                />
+              ) : (
+                <div className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+                  {(user?.name ?? "?").slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{user?.name}</div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {user?.email}
+                </div>
               </div>
             </div>
             <Button

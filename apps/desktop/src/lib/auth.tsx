@@ -15,6 +15,8 @@ interface AuthContextValue {
     password: string,
   ) => Promise<void>;
   logout: () => void;
+  /** Push a fresh PublicUser into context (e.g. after a profile update). */
+  updateUser: (next: PublicUser) => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -79,8 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [apply],
   );
 
+  const updateUser = React.useCallback((next: PublicUser) => setUser(next), []);
+
   return (
-    <AuthContext.Provider value={{ user, status, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, status, login, register, logout, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -76,6 +77,30 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('Account no longer exists.');
     return toPublicUser(user);
+  }
+
+  async updateProfile(
+    id: string,
+    changes: { name?: string; avatar?: string },
+  ): Promise<PublicUser> {
+    if (
+      changes.avatar &&
+      !/^(https:\/\/|data:image\/(png|jpeg|webp|svg\+xml);base64,)/.test(
+        changes.avatar,
+      )
+    ) {
+      throw new BadRequestException(
+        'avatar must be an https URL or a base64 image data URI',
+      );
+    }
+    const set = {
+      ...(changes.name !== undefined && { name: changes.name }),
+      ...(changes.avatar !== undefined && { avatar: changes.avatar || null }),
+    };
+    if (Object.keys(set).length > 0) {
+      await this.db.update(users).set(set).where(eq(users.id, id));
+    }
+    return this.findById(id);
   }
 
   private async issue(user: User): Promise<AuthResult> {
