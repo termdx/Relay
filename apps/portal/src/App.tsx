@@ -28,8 +28,42 @@ import {
   type PortalVisibility,
 } from "./api";
 
-const AGENCY_NAME: string =
+const FALLBACK_NAME: string =
   (import.meta.env.VITE_AGENCY_NAME as string | undefined) ?? "Project Portal";
+
+/** White/near-black foreground by accent luminance (YIQ). */
+function contrastForeground(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const yiq =
+    (((n >> 16) & 255) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000;
+  return yiq >= 150 ? "#1c1930" : "#ffffff";
+}
+
+/** Fetches agency branding (public) and themes the whole app with it. */
+function useBranding() {
+  const query = useQuery({
+    queryKey: ["branding"],
+    queryFn: portal.branding,
+    staleTime: 5 * 60 * 1000,
+  });
+  const data = query.data;
+
+  React.useEffect(() => {
+    if (!data) return;
+    document.title = data.agencyName ?? FALLBACK_NAME;
+    if (data.accentColor) {
+      const root = document.documentElement.style;
+      root.setProperty("--primary", data.accentColor);
+      root.setProperty("--ring", data.accentColor);
+      root.setProperty("--primary-foreground", contrastForeground(data.accentColor));
+    }
+  }, [data]);
+
+  return {
+    name: data?.agencyName ?? FALLBACK_NAME,
+    logo: data?.logo ?? null,
+  };
+}
 
 /* ── auth shell ──────────────────────────────────────────────────────────── */
 
@@ -76,6 +110,7 @@ function Redeem({ token }: { token: string }) {
 }
 
 function Login() {
+  const { name, logo } = useBranding();
   const [email, setEmail] = React.useState("");
   const request = useMutation({
     mutationFn: () => portal.requestLink(email),
@@ -84,7 +119,10 @@ function Login() {
   return (
     <Centered>
       <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6">
-        <h1 className="text-lg font-semibold tracking-tight">{AGENCY_NAME}</h1>
+        {logo && (
+          <img src={logo} alt="" className="mb-3 size-10 object-contain" />
+        )}
+        <h1 className="text-lg font-semibold tracking-tight">{name}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Enter your email and we’ll send you a sign-in link.
         </p>
@@ -138,6 +176,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 type Tab = "overview" | "ask" | "approvals";
 
 function Portal() {
+  const { name: agencyName, logo } = useBranding();
   const me = useQuery({ queryKey: ["me"], queryFn: portal.me });
   const [projectId, setProjectId] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<Tab>("overview");
@@ -165,11 +204,14 @@ function Portal() {
   return (
     <div className="mx-auto max-w-4xl px-4 pb-16">
       <header className="flex items-center justify-between py-5">
-        <div>
-          <div className="text-base font-semibold tracking-tight">{AGENCY_NAME}</div>
-          <div className="text-xs text-muted-foreground">
-            {me.data.client.name}
-            {me.data.client.company ? ` · ${me.data.client.company}` : ""}
+        <div className="flex items-center gap-3">
+          {logo && <img src={logo} alt="" className="size-9 object-contain" />}
+          <div>
+            <div className="text-base font-semibold tracking-tight">{agencyName}</div>
+            <div className="text-xs text-muted-foreground">
+              {me.data.client.name}
+              {me.data.client.company ? ` · ${me.data.client.company}` : ""}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">

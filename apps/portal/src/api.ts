@@ -137,7 +137,15 @@ export interface AskResult {
   sources: AskSource[];
 }
 
+export interface PortalBranding {
+  agencyName: string | null;
+  logo: string | null;
+  accentColor: string | null;
+}
+
 export const portal = {
+  branding: () =>
+    request<PortalBranding>("/portal/branding", { auth: false }),
   requestLink: (email: string) =>
     request<{ status: string }>("/portal/auth/request-link", {
       method: "POST",

@@ -10,6 +10,7 @@ export * from '../modules/timeline/timeline.schema';
 export * from '../modules/todo/todo.schema';
 export * from '../modules/knowledge/knowledge.schema';
 export * from '../modules/portal/portal.schema';
+export * from '../modules/branding/branding.schema';
 export * from '../modules/decision/decision.schema';
 export * from '../modules/meeting/meeting.schema';
 export * from '../modules/approval/approval.schema';

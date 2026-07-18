@@ -110,6 +110,12 @@ export interface Decision {
   createdAt: string;
 }
 
+export interface Branding {
+  agencyName: string | null;
+  logo: string | null;
+  accentColor: string | null;
+}
+
 export interface AskSource {
   ref: number;
   cited: boolean;

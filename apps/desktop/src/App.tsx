@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { RuntimeWorkspaceProvider } from "@/lib/runtime-workspace";
+import { BrandingPage } from "@/pages/branding";
 import { ClientDetailPage } from "@/pages/client-detail";
 import { ClientsPage } from "@/pages/clients";
 import { MeetingDetailPage } from "@/pages/meeting-detail";
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/clients/:id" element={<ClientDetailPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/branding" element={<BrandingPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/meetings/new" element={<NewMeetingPage />} />
           <Route path="/meetings/:id" element={<MeetingDetailPage />} />

@@ -71,6 +71,14 @@ export const backend = {
         body: { question },
       }),
   },
+  branding: {
+    get: () => backendRequest<import("./types").Branding>("/branding"),
+    update: (body: Partial<import("./types").Branding>) =>
+      backendRequest<import("./types").Branding>("/branding", {
+        method: "PUT",
+        body,
+      }),
+  },
   knowledge: {
     reindex: () =>
       backendRequest<{ scanned: number; added: number }>(

@@ -10,6 +10,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { ApprovalModule } from './modules/approval/approval.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
+import { BrandingModule } from './modules/branding/branding.module';
 import { ClientModule } from './modules/client/client.module';
 import { DecisionModule } from './modules/decision/decision.module';
 import { GithubModule } from './modules/integration/github/github.module';
@@ -42,6 +43,7 @@ import { TodoModule } from './modules/todo/todo.module';
     KnowledgeModule,
     NotificationModule,
     PortalModule,
+    BrandingModule,
     AiModule,
     GithubModule,
     ApprovalModule,
