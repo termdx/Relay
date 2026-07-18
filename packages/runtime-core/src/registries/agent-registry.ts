@@ -32,6 +32,32 @@ export class AgentRegistry {
     return this.store.remove(id);
   }
 
+  /** Update an agent in place; unset fields keep their current value. */
+  async update(
+    id: string,
+    changes: Partial<Omit<CreateAgentInput, 'id'>>,
+  ): Promise<AgentManifest> {
+    const existing = await this.store.read(id);
+    const memoryKind = changes.memory ?? existing.memory.kind;
+    const manifest = agentManifestSchema.parse({
+      ...existing,
+      name: changes.name ?? existing.name,
+      description: changes.description ?? existing.description,
+      model: changes.model ?? existing.model,
+      // Empty string clears the mission; undefined keeps it.
+      mission:
+        changes.mission !== undefined
+          ? changes.mission || undefined
+          : existing.mission,
+      projects: changes.projects ?? existing.projects,
+      tools: changes.tools ?? existing.tools,
+      workflow: changes.workflow ?? existing.workflow,
+      memory: { enabled: memoryKind !== 'none', kind: memoryKind },
+    });
+    await this.store.write(manifest);
+    return manifest;
+  }
+
   async create(input: CreateAgentInput): Promise<AgentManifest> {
     const memoryKind = input.memory ?? 'none';
     const manifest = agentManifestSchema.parse({

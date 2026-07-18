@@ -220,6 +220,17 @@ export const runtime = {
         memory?: "none" | "buffer" | "vector";
       },
     ) => rpc<{ id: string }>(["agents", "create"], [cwd, input]),
+    update: (
+      cwd: string,
+      id: string,
+      changes: {
+        name?: string;
+        model?: string;
+        mission?: string;
+        projects?: string[];
+        tools?: string[];
+      },
+    ) => rpc<{ id: string }>(["agents", "update"], [cwd, id, changes]),
     remove: (cwd: string, id: string) => rpc<void>(["agents", "remove"], [cwd, id]),
   },
   stack: {

@@ -85,6 +85,8 @@ export class HttpClient implements RuntimeApi {
     list: (cwd) => this.rpc(['agents', 'list'], [cwd]),
     info: (cwd, id) => this.rpc(['agents', 'info'], [cwd, id]),
     create: (cwd, input) => this.rpc(['agents', 'create'], [cwd, input]),
+    update: (cwd, id, changes) =>
+      this.rpc(['agents', 'update'], [cwd, id, changes]),
     remove: (cwd, id) => this.rpc(['agents', 'remove'], [cwd, id]),
   };
 

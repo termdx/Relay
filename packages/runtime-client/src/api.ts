@@ -107,6 +107,11 @@ export interface AgentsApi {
   list(cwd: string): Promise<AgentManifest[]>;
   info(cwd: string, id: string): Promise<AgentManifest>;
   create(cwd: string, input: CreateAgentInput): Promise<AgentManifest>;
+  update(
+    cwd: string,
+    id: string,
+    changes: Partial<Omit<CreateAgentInput, 'id'>>,
+  ): Promise<AgentManifest>;
   remove(cwd: string, id: string): Promise<void>;
 }
 

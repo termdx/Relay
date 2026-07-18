@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Play, Plus, Trash2, Workflow, Wrench } from "lucide-react";
+import { Bot, Pencil, Play, Plus, Trash2, Workflow, Wrench } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ export function RuntimeAgentsPage() {
   const queryClient = useQueryClient();
   const [newWorkflow, setNewWorkflow] = React.useState(false);
   const [newAgent, setNewAgent] = React.useState(false);
+  const [editing, setEditing] = React.useState<AgentListItem | null>(null);
   const [running, setRunning] = React.useState<{
     id: string;
     name: string;
@@ -121,6 +122,7 @@ export function RuntimeAgentsPage() {
                 meta={`${a.model}${a.workflow ? ` · ${a.workflow}` : ""}`}
                 onRemove={() => removeAgent.mutate(a.id)}
                 onRun={() => setRunning(a)}
+                onEdit={() => setEditing(a)}
               />
             ))}
           </div>
@@ -135,17 +137,36 @@ export function RuntimeAgentsPage() {
         onOpenChange={setNewWorkflow}
         onDone={() => queryClient.invalidateQueries({ queryKey: ["workflows", cwd] })}
       />
-      <NewAgentDialog
+      <AgentDialog
         cwd={cwd}
         open={newAgent}
         onOpenChange={setNewAgent}
         onDone={() => queryClient.invalidateQueries({ queryKey: ["agents", cwd] })}
       />
+      {editing && (
+        <AgentDialog
+          cwd={cwd}
+          open
+          editing={editing}
+          onOpenChange={(v) => !v && setEditing(null)}
+          onDone={() => queryClient.invalidateQueries({ queryKey: ["agents", cwd] })}
+        />
+      )}
       {running && (
         <RunAgentDialog agent={running} onClose={() => setRunning(null)} />
       )}
     </div>
   );
+}
+
+interface AgentListItem {
+  id: string;
+  name: string;
+  model: string;
+  mission?: string;
+  projects?: string[];
+  tools?: string[];
+  workflow?: string;
 }
 
 function Row({
@@ -154,12 +175,14 @@ function Row({
   meta,
   onRemove,
   onRun,
+  onEdit,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   meta: string;
   onRemove: () => void;
   onRun?: () => void;
+  onEdit?: () => void;
 }) {
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
@@ -173,6 +196,11 @@ function Row({
           <Button variant="ghost" size="sm" onClick={onRun}>
             <Play className="size-4" />
             Run
+          </Button>
+        )}
+        {onEdit && (
+          <Button variant="ghost" size="icon" onClick={onEdit} aria-label={`Edit ${title}`}>
+            <Pencil className="size-4" />
           </Button>
         )}
         <Button variant="ghost" size="icon" onClick={onRemove} aria-label={`Remove ${title}`}>
@@ -547,22 +575,28 @@ const INTEGRATION_TOOLS: { tool: string; label: string; hint: string }[] = [
   { tool: "email_owner", label: "Email", hint: "send you reports (never clients)" },
 ];
 
-function NewAgentDialog({
+function AgentDialog({
   cwd,
   open,
   onOpenChange,
   onDone,
+  editing,
 }: {
   cwd: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onDone: () => void;
+  editing?: AgentListItem;
 }) {
-  const [name, setName] = React.useState("");
-  const [model, setModel] = React.useState("gemini/gemini-flash-latest");
-  const [mission, setMission] = React.useState("");
-  const [projectIds, setProjectIds] = React.useState<string[]>([]);
-  const [tools, setTools] = React.useState<string[]>([]);
+  const [name, setName] = React.useState(editing?.name ?? "");
+  const [model, setModel] = React.useState(
+    editing?.model ?? "gemini/gemini-flash-latest",
+  );
+  const [mission, setMission] = React.useState(editing?.mission ?? "");
+  const [projectIds, setProjectIds] = React.useState<string[]>(
+    editing?.projects ?? [],
+  );
+  const [tools, setTools] = React.useState<string[]>(editing?.tools ?? []);
 
   const projects = useQuery({
     queryKey: ["projects"],
@@ -570,24 +604,66 @@ function NewAgentDialog({
     enabled: open,
   });
 
+  // Live model options from installed AI providers; curated fallback if the
+  // probe fails or nothing is installed yet.
+  const modelOptions = useQuery({
+    queryKey: ["agent-model-options", cwd],
+    enabled: open,
+    queryFn: async () => {
+      const fallback = [
+        "gemini/gemini-flash-latest",
+        "gemini/gemini-3.5-flash",
+        "gemini/gemini-flash-lite-latest",
+      ];
+      try {
+        const providers = await runtime.ai.list(cwd);
+        const lists = await Promise.all(
+          providers.map((p) =>
+            runtime.ai
+              .models(cwd, p.id)
+              .then((models) => models.map((m) => `${p.provider}/${m}`))
+              .catch(() => [] as string[]),
+          ),
+        );
+        const found = lists.flat();
+        return found.length > 0 ? found : fallback;
+      } catch {
+        return fallback;
+      }
+    },
+  });
+
+  const options = React.useMemo(() => {
+    const list = modelOptions.data ?? [];
+    // Keep the current value selectable even if the probe doesn't list it.
+    return model && !list.includes(model) ? [model, ...list] : list;
+  }, [modelOptions.data, model]);
+
   const create = useMutation({
-    mutationFn: () =>
-      runtime.agents.create(cwd, {
-        id: slug(name),
+    mutationFn: () => {
+      const fields = {
         name,
         model,
-        mission: mission.trim() || undefined,
+        mission: mission.trim(),
         projects: projectIds,
         tools,
-      }),
+      };
+      return editing
+        ? runtime.agents.update(cwd, editing.id, fields)
+        : runtime.agents.create(cwd, { id: slug(name), ...fields, mission: fields.mission || undefined });
+    },
     onSuccess: () => {
-      toast.success("Agent created — hit Run anytime, no setup needed");
+      toast.success(
+        editing ? "Agent updated" : "Agent created — hit Run anytime, no setup needed",
+      );
       onDone();
       onOpenChange(false);
-      setName("");
-      setMission("");
-      setProjectIds([]);
-      setTools([]);
+      if (!editing) {
+        setName("");
+        setMission("");
+        setProjectIds([]);
+        setTools([]);
+      }
     },
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Failed"),
   });
@@ -599,7 +675,7 @@ function NewAgentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>New agent</DialogTitle>
+          <DialogTitle>{editing ? `Edit ${editing.id}` : "New agent"}</DialogTitle>
           <DialogDescription>
             A mission + projects + granted integrations. Run executes the
             mission with zero further input.
@@ -618,13 +694,19 @@ function NewAgentDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ag-model">Model</Label>
-              <Input
-                id="ag-model"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="font-mono text-sm"
-              />
+              <Label>Model</Label>
+              <Select value={model} onValueChange={setModel}>
+                <SelectTrigger className="font-mono text-xs">
+                  <SelectValue placeholder="Pick a model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((option) => (
+                    <SelectItem key={option} value={option} className="font-mono text-xs">
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -709,7 +791,7 @@ function NewAgentDialog({
             }
           >
             {create.isPending && <Spinner className="size-4" />}
-            Create agent
+            {editing ? "Save changes" : "Create agent"}
           </Button>
         </DialogFooter>
       </DialogContent>

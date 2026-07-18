@@ -132,6 +132,8 @@ export class InProcessClient implements RuntimeApi {
     info: async (cwd, id) => (await RuntimeEngine.open(cwd)).agents.info(id),
     create: async (cwd, input) =>
       (await RuntimeEngine.open(cwd)).createAgent(input),
+    update: async (cwd, id, changes) =>
+      (await RuntimeEngine.open(cwd)).agents.update(id, changes),
     remove: async (cwd, id) => {
       const engine = await RuntimeEngine.open(cwd);
       await engine.agents.remove(id);
