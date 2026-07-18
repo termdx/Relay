@@ -22,6 +22,13 @@
       "when": 1784368883842,
       "tag": "0002_silent_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784374601108,
+      "tag": "0003_famous_mandarin",
+      "breakpoints": true
     }
   ]
 }

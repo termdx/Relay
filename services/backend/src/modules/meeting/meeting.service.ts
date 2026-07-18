@@ -193,8 +193,10 @@ export class MeetingService {
   }
 
   /**
-   * Apply a client's decision. Invoked from the approval event handler, not
-   * from a request. On approval, pushes the tasks to GitHub.
+   * Apply a client's decision. Delivered by the transactional outbox with
+   * retry — so this method is IDEMPOTENT: a repeat delivery after a partial
+   * failure finishes the remaining work instead of redoing it. Tasks that
+   * already carry a githubIssueUrl are never published twice.
    */
   async applyDecision(
     meetingId: string,
@@ -202,6 +204,9 @@ export class MeetingService {
     comment: string | null,
   ): Promise<void> {
     const meeting = await this.findOne(meetingId);
+
+    // Redelivery after the work already completed: nothing to do.
+    if (meeting.status === decision) return;
 
     if (decision === 'CHANGES_REQUESTED') {
       await this.db
@@ -221,16 +226,11 @@ export class MeetingService {
       return;
     }
 
-    // KNOWN LIMITATION (v0.1): this runs in an event handler with no retry or
-    // compensation. The stub never fails, so it's invisible today — but with a
-    // real GitHub adapter, a transient failure here leaves the approval APPROVED
-    // while the meeting stays PENDING_APPROVAL, and idempotency blocks a retry.
-    // This is exactly the durable-execution seam Temporal is meant to own
-    // (CLAUDE.md: "every external integration should have retries"). Move this
-    // to a Temporal activity before the real adapter ships.
+    // Publish only what hasn't landed yet; a retry resumes where it failed.
+    const unpublished = meeting.tasks.filter((task) => !task.githubIssueUrl);
     const published = await this.issuePublisher.publishIssues(
       meeting.githubRepo,
-      meeting.tasks.map((task) => ({
+      unpublished.map((task) => ({
         title: task.title,
         body: task.body,
         assignee: task.assignee,
@@ -240,7 +240,7 @@ export class MeetingService {
     await this.db.transaction(async (tx) => {
       await Promise.all(
         published.map((issue, index) => {
-          const task = meeting.tasks[index];
+          const task = unpublished[index];
           if (!task) return Promise.resolve();
           return tx
             .update(meetingTasks)

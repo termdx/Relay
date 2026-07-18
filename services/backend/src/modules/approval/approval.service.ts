@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
+import { OutboxService } from '../outbox/outbox.service';
 import { APPROVAL_DECIDED, type ApprovalDecidedEvent } from './approval.events';
 import {
   approvals,
@@ -17,7 +17,7 @@ export class ApprovalService {
 
   constructor(
     @Inject(DRIZZLE) private readonly db: RelayDb,
-    private readonly events: EventEmitter2,
+    private readonly outbox: OutboxService,
   ) {}
 
   /** Create a pending approval for a meeting and return it (token included). */
@@ -51,17 +51,37 @@ export class ApprovalService {
    * Record a client's decision. A second response to an already-decided
    * approval is rejected rather than silently overwritten — enforced in the
    * UPDATE's WHERE clause, so concurrent submits cannot both win.
+   *
+   * The follow-up work (publish issues, notify) is enqueued on the outbox in
+   * the SAME transaction as the decision: either both persist or neither —
+   * the decision can never land without its side effects being owed.
    */
   async respond(
     token: string,
     decision: Exclude<ApprovalStatus, 'PENDING'>,
     comment: string | null,
   ): Promise<Approval> {
-    const [updated] = await this.db
-      .update(approvals)
-      .set({ status: decision, clientComment: comment, respondedAt: new Date() })
-      .where(and(eq(approvals.token, token), eq(approvals.status, 'PENDING')))
-      .returning();
+    const updated = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(approvals)
+        .set({
+          status: decision,
+          clientComment: comment,
+          respondedAt: new Date(),
+        })
+        .where(and(eq(approvals.token, token), eq(approvals.status, 'PENDING')))
+        .returning();
+      if (!row) return undefined;
+
+      const event: ApprovalDecidedEvent = {
+        meetingId: row.meetingId,
+        approvalId: row.id,
+        decision,
+        comment,
+      };
+      await this.outbox.enqueue(tx, APPROVAL_DECIDED, { ...event });
+      return row;
+    });
 
     if (!updated) {
       // Either the token is unknown (404) or it was already decided.
@@ -71,14 +91,6 @@ export class ApprovalService {
       );
       return existing;
     }
-
-    const event: ApprovalDecidedEvent = {
-      meetingId: updated.meetingId,
-      approvalId: updated.id,
-      decision,
-      comment,
-    };
-    this.events.emit(APPROVAL_DECIDED, event);
 
     return updated;
   }

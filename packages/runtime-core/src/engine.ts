@@ -221,6 +221,20 @@ export class RuntimeEngine {
     const apiKey = provider ? await this.ai.resolveApiKey(provider) : undefined;
     Object.assign(env, aiProviderEnv(provider, apiKey));
 
+    // Installed integrations: resolve each credential secret into an env var
+    // (github.token → GITHUB_TOKEN) so adapters select themselves by config.
+    for (const integration of await this.integrations.list()) {
+      for (const field of integration.credentials) {
+        const value = await this.secrets.get(field.secretRef);
+        if (value) {
+          const key = `${integration.id}_${field.name}`
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, '_');
+          env[key] = value;
+        }
+      }
+    }
+
     const compose = buildComposeFile(this.config, modules);
     const composeYaml = serializeCompose(compose);
     const lock = {

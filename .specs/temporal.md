@@ -12,9 +12,10 @@ compensation as infrastructure — not hand-rolled per call site.
 
 ## Ladder
 
-1. **Now** — in-process events; acceptable while all adapters are stubs.
-2. **Next: transactional outbox** — events persisted with state, relayed with
-   retry. Minimum bar before real external adapters multiply.
+1. ~~In-process events~~ — retained only for derived state (timeline).
+2. **Now: transactional outbox** (shipped) — side effects persisted in the
+   same transaction as state, relayed with SKIP LOCKED + exponential backoff.
+   The approval → GitHub publish runs on it; survives process restarts.
 3. **Target: Temporal** — workflows own multi-step processes; backend modules
    keep the business logic and are invoked as activities.
 

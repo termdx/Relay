@@ -10,6 +10,10 @@ export const PG_POOL = Symbol('PG_POOL');
 /** The typed database handle injected into services. */
 export type RelayDb = NodePgDatabase<typeof schema>;
 
+/** The handle inside `db.transaction(async (tx) => …)` — for code that must
+ * run within the caller's transaction (e.g. outbox enqueue). */
+export type RelayTx = Parameters<Parameters<RelayDb['transaction']>[0]>[0];
+
 export const pgPoolProvider: Provider = {
   provide: PG_POOL,
   inject: [ConfigService],

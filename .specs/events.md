@@ -29,10 +29,12 @@ integration id). Events with a `projectId` become timeline entries.
 
 ## Delivery
 
-- Today: in-process NestJS event emitter (approval → meeting handler).
-- Next: **transactional outbox** — events written in the same transaction as
-  state, relayed asynchronously. This is the minimum bar before external
-  side effects hang off events.
+- **In-process bus** (shipped) — the firehose for derived state: timeline
+  today, knowledge later. At-most-once is acceptable here (rebuildable).
+- **Transactional outbox** (shipped) — external side effects are enqueued in
+  the same transaction as the state change, relayed with SKIP LOCKED claims
+  and exponential backoff (2s → 5min cap, 8 attempts, then parked FAILED).
+  The approval → publish-issues step runs on it.
 - Later: Temporal signals/workflows subsume the retry/durability concerns
   (see `temporal.md`).
 

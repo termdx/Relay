@@ -1,36 +1,33 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   APPROVAL_DECIDED,
   type ApprovalDecidedEvent,
 } from '../approval/approval.events';
+import { OutboxService } from '../outbox/outbox.service';
 import { MeetingService } from './meeting.service';
 
 /**
- * Reacts to a client's approval decision. This is the event-driven seam
- * between the approval and meeting modules — approval never calls meeting
- * directly (`events.md`: services publish events instead of invoking each
- * other).
+ * Applies a client's approval decision — delivered via the transactional
+ * outbox, so a transient failure (e.g. GitHub down) is retried with backoff
+ * instead of stranding the meeting. Errors are RETHROWN on purpose: the
+ * outbox owns retry; swallowing here would mark the message DONE.
+ * `applyDecision` is idempotent, so redelivery is safe.
  */
 @Injectable()
-export class MeetingApprovalHandler {
-  private readonly logger = new Logger(MeetingApprovalHandler.name);
+export class MeetingApprovalHandler implements OnModuleInit {
+  constructor(
+    private readonly meetings: MeetingService,
+    private readonly outbox: OutboxService,
+  ) {}
 
-  constructor(private readonly meetings: MeetingService) {}
-
-  @OnEvent(APPROVAL_DECIDED)
-  async handleApprovalDecided(event: ApprovalDecidedEvent): Promise<void> {
-    try {
+  onModuleInit(): void {
+    this.outbox.register(APPROVAL_DECIDED, async (payload) => {
+      const event = payload as unknown as ApprovalDecidedEvent;
       await this.meetings.applyDecision(
         event.meetingId,
         event.decision,
         event.comment,
       );
-    } catch (error) {
-      this.logger.error(
-        `Failed to apply approval decision for meeting ${event.meetingId}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-    }
+    });
   }
 }

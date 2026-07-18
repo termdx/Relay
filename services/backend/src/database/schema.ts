@@ -3,6 +3,7 @@
  * barrel is what the driver (and drizzle-kit) sees as one schema.
  */
 export * from '../modules/auth/auth.schema';
+export * from '../modules/outbox/outbox.schema';
 export * from '../modules/client/client.schema';
 export * from '../modules/project/project.schema';
 export * from '../modules/timeline/timeline.schema';

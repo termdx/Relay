@@ -29,6 +29,9 @@ const MODULES = {
           AI_PROVIDER: '${AI_PROVIDER}',
           GEMINI_API_KEY: '${GEMINI_API_KEY}',
           GEMINI_MODEL: '${GEMINI_MODEL}',
+          // Integration credentials, resolved from the secret store at
+          // generate time; ':-' keeps compose quiet when not installed.
+          GITHUB_TOKEN: '${GITHUB_TOKEN:-}',
         },
         dependsOn: ['postgres'],
         restart: 'unless-stopped',

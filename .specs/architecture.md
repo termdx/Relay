@@ -54,11 +54,13 @@ bundles the daemon as a sidecar. See `runtime.md`.
 | Piece | State |
 |---|---|
 | Runtime kernel (manifests, secrets, compose, daemon, CLI) | shipped |
-| Backend: auth, meeting → approval → GitHub loop | shipped (GitHub adapter is a stub) |
-| Desktop: auth, meeting review, runtime admin | shipped |
-| Client & project entities | next |
-| Timeline / events backbone | next |
+| Backend: auth, meeting → approval → GitHub loop | shipped |
+| Desktop: auth, clients/projects/timeline, meeting review, runtime admin | shipped |
+| Client & project entities + event backbone + timeline | shipped |
+| Transactional outbox (durable external writes) | shipped |
+| GitHub adapter (real REST, token-selected; stub offline) | shipped |
+| Todos & decisions entities | next |
+| Remaining adapters (GitLab, Bitbucket, Slack, Discord, GCal, SMTP, S3) | planned |
 | Knowledge engine | planned |
 | Client portal + Relay AI chat | planned |
-| Real integration adapters (the list in `integrations.md`) | planned |
-| Temporal | planned — adopt before external adapters multiply |
+| Temporal | planned — subsumes the outbox |

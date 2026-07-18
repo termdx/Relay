@@ -24,7 +24,7 @@ encrypted secret store; manifests and code never contain values.
 
 | Integration | Direction | Purpose | Status |
 |---|---|---|---|
-| GitHub | both | issues out; commits/PRs/reviews in | port + stub shipped |
+| GitHub | both | issues out; commits/PRs/reviews in | adapter shipped (real REST + stub, token-selected) |
 | GitLab | both | same as GitHub | planned |
 | Bitbucket | both | same as GitHub | planned |
 | Slack | both | notifications out; messages/decisions in | catalog entry only |
@@ -37,9 +37,9 @@ encrypted secret store; manifests and code never contain values.
 
 - **Inbound**: webhook receivers normalize vendor payloads into domain events
   (`timeline` ingests them). Vendor payloads never leak past the adapter.
-- **Outbound**: every external write goes through the orchestration layer
+- **Outbound**: every external write goes through the transactional outbox
   (durable, retried, idempotent) — never fired directly from an event handler.
-  This is a hard prerequisite before adapter #3 ships (see `temporal.md`).
+  Shipped; Temporal subsumes it later (see `temporal.md`).
 - **Client-visible side effects** (issue created, email sent) require a prior
   approval record.
 - Adapters ship with a stub implementation for dev/test; provider selection is

@@ -13,6 +13,7 @@ import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { ClientModule } from './modules/client/client.module';
 import { GithubModule } from './modules/integration/github/github.module';
 import { MeetingModule } from './modules/meeting/meeting.module';
+import { OutboxModule } from './modules/outbox/outbox.module';
 import { ProjectModule } from './modules/project/project.module';
 import { TimelineModule } from './modules/timeline/timeline.module';
 
@@ -25,6 +26,8 @@ import { TimelineModule } from './modules/timeline/timeline.module';
     DatabaseModule,
     // Domain event bus (events.md) — global, feeds timeline + knowledge.
     EventsModule,
+    // Transactional outbox (temporal.md rung 2) — durable side effects.
+    OutboxModule,
     AuthModule,
     ClientModule,
     ProjectModule,

@@ -16,7 +16,8 @@ event-driven communication between them.
 | knowledge | Ingestion + retrieval over pgvector; the source of truth | planned |
 | notification | Fan-out to Slack/Discord/email on events | planned |
 | storage | File/image uploads to S3-compatible object storage | planned |
-| integration/* | One adapter module per external tool, behind ports | github stub |
+| outbox | Transactional outbox: durable, retried external side effects | shipped |
+| integration/* | One adapter module per external tool, behind ports | github shipped |
 | ai | Capability ports (draft, chat, embed) + provider adapters | draft shipped |
 
 ## Rules
