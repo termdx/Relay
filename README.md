@@ -1,51 +1,51 @@
-# Relay App
+# Relay
 
-is an AI-native operating system for software agencies.
+The operating system for freelancers, agencies, and indie hackers who build
+and ship software for clients.
 
-Unlike Jira or ClickUp, Agency OS is not a project management tool.
+Relay is not another project-management tool. It connects the tools you
+already use (GitHub, GitLab, Bitbucket, Slack, Discord, Google Calendar,
+email, S3), tracks every event, todo, and decision per client, and maintains a
+**knowledge base that is the source of truth** for the whole project
+lifecycle. A client-facing portal at `relay.<company>.com` lets clients see
+status and ask the Relay AI chatbot anything — answered from that knowledge
+base.
 
-It is the orchestration layer responsible for:
-
-- Clients
-- Developers
-- Projects
-- AI
-- Meetings
-- Deployments
-- Billing
-- Knowledge
-- Automation
-
-The desktop application acts as the control plane while the backend is the source of truth.
+The desktop app is the control plane; the backend is the system of record;
+the knowledge engine is the source of truth.
 
 ## Documents
 
 .specs/
 
-- architecture.md
-- backend.md
-- desktop.md
-- ai.md
-- temporal.md
-- database.md
-- events.md
-- security.md
-- integrations.md
-- deployment.md
+- vision.md — who Relay is for and the core loop
+- architecture.md — the four systems and how the layers fit
+- runtime.md — the workspace/manifest kernel
+- backend.md — modular monolith and its modules
+- database.md — Postgres (+pgvector), S3 object storage
+- knowledge.md — the knowledge engine (source of truth)
+- portal.md — client portal + Relay AI chat
+- integrations.md — ports, adapters, and the supported set
+- events.md — the event backbone
+- ai.md — capabilities, providers, approval rules
+- desktop.md — the founder control plane
+- temporal.md — orchestration ladder (outbox → Temporal)
+- security.md — identities, isolation, secrets
+- deployment.md — self-hosted model
 - coding-standards.md
-
-This documentation defines the initial technical architecture for Relay app.
 
 ## Monorepo layout
 
-pnpm workspace. Only the desktop app is scaffolded today; the other pillars
-have reserved homes so the layout mirrors the target architecture.
-
 ```
 apps/
-  desktop/        Tauri v2 + React + TypeScript control plane (SQLite local)
-packages/         Shared TS libraries (@relay/*) — see packages/README.md
-services/         Backend / AI runtime / orchestrator — see services/README.md
+  desktop/        Tauri v2 + React control plane (runtime daemon as sidecar)
+  cli/            relay CLI over the runtime engine
+packages/
+  runtime-core/   Workspace kernel: manifests, secrets, compose, lifecycle
+  runtime-client/ Typed client for the runtime API (in-process + HTTP)
+services/
+  backend/        NestJS modular monolith (system of record)
+  runtime/        Runtime HTTP daemon (:51720)
 tsconfig.base.json  Shared strict TypeScript config
 pnpm-workspace.yaml Workspace definition
 ```
@@ -60,7 +60,9 @@ pnpm-workspace.yaml Workspace definition
 
 ```bash
 pnpm install          # install JS deps for all workspace packages
-pnpm desktop:dev      # run the Tauri desktop app in dev mode
+pnpm dev              # full local stack: runtime daemon + Postgres + backend + desktop
+pnpm dev:local        # fast backend iteration (standalone Postgres + nest start)
+pnpm dev:web          # desktop UI in the browser — no Rust build
 pnpm desktop:build    # produce a production desktop bundle
 ```
 

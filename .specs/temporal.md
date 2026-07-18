@@ -1,16 +1,32 @@
-# Temporal
+# Orchestration
 
-Temporal orchestrates workflows.
+Durable execution for everything that touches the outside world or runs long.
 
-Examples:
+## Why
 
--   New client onboarding
--   Meeting processing
--   Deployment approval
--   Weekly reports
+The moment a real integration adapter ships, a naked event handler is a
+liability: approval lands, the GitHub publish fails mid-flight, state is stuck
+and idempotency blocks the retry (the meeting module carries exactly this
+known limitation today). External writes need retries, timeouts, and
+compensation as infrastructure — not hand-rolled per call site.
 
-Temporal coordinates work.
+## Ladder
 
-Business logic remains inside backend modules.
+1. **Now** — in-process events; acceptable while all adapters are stubs.
+2. **Next: transactional outbox** — events persisted with state, relayed with
+   retry. Minimum bar before real external adapters multiply.
+3. **Target: Temporal** — workflows own multi-step processes; backend modules
+   keep the business logic and are invoked as activities.
 
-LangGraph is invoked as workflow activities when reasoning is required.
+## Temporal workflows (target)
+
+- Meeting processing: draft → approval wait → publish issues → notify client.
+- Client onboarding: portal invite → integration linking → kickoff digest.
+- Weekly report: gather timeline → draft digest → approval → email via SMTP.
+- Knowledge ingestion backfill: replay timeline → chunk → embed.
+
+## Rules
+
+- Workflows coordinate; modules decide. No business logic in workflow code.
+- Activities are idempotent — publishing twice must be safe.
+- AI reasoning steps are activities like any other (retryable, timeboxed).

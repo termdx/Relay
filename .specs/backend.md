@@ -1,31 +1,37 @@
 # Backend
 
-## Principles
-
--   Modular monolith
--   Thin API
--   Domain-driven modules
--   Event-driven communication
+NestJS modular monolith. System of record. Thin API, domain-driven modules,
+event-driven communication between them.
 
 ## Modules
 
--   Auth
--   Client
--   Project
--   Timeline
--   Meeting
--   Knowledge
--   Deployment
--   Notification
--   AI
+| Module | Purpose | Status |
+|---|---|---|
+| auth | Owner setup, login, JWT guard | shipped |
+| client | Client records — the anchor entity for everything | next |
+| project | Projects under a client; members, repos, links | next |
+| timeline | Append-only event feed per project | next |
+| meeting | Transcript → AI draft → approval → tasks | shipped |
+| approval | Snapshot + magic-link decisions (generalizes beyond meetings) | shipped |
+| knowledge | Ingestion + retrieval over pgvector; the source of truth | planned |
+| notification | Fan-out to Slack/Discord/email on events | planned |
+| storage | File/image uploads to S3-compatible object storage | planned |
+| integration/* | One adapter module per external tool, behind ports | github stub |
+| ai | Capability ports (draft, chat, embed) + provider adapters | draft shipped |
 
-API responsibilities:
+## Rules
 
--   Authentication
--   CRUD
--   Validation
--   File uploads
--   WebSocket
--   Start Temporal workflows
+- Controllers hold no business logic; services own their domain.
+- Every module owns its own Drizzle schema file; `database/schema.ts` is a
+  barrel that composes them.
+- Modules communicate through domain events, not direct imports of each
+  other's services; integration adapters are invoked behind DI ports.
+- No long-running AI work inside request handlers — draft generation is the
+  current tolerated exception until the orchestration layer lands.
+- Everything client-visible passes through the approval module before any
+  external side effect fires.
 
-Never execute long-running AI tasks inside request handlers.
+## API responsibilities
+
+Authentication, CRUD, validation, file uploads, webhook receivers (per
+integration), starting workflows, and serving the client portal's scoped API.
