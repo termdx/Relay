@@ -570,7 +570,7 @@ function NewWorkflowDialog({
 }
 
 const INTEGRATION_TOOLS: { tool: string; label: string; hint: string }[] = [
-  { tool: "publish_issue", label: "Issue tracker", hint: "file issues in the project repo" },
+  { tool: "publish_issue", label: "Issue tracker", hint: "read & file issues in the project repo" },
   { tool: "notify_team", label: "Team chat", hint: "post to Slack / Discord" },
   { tool: "email_owner", label: "Email", hint: "send you reports (never clients)" },
 ];

@@ -207,14 +207,16 @@ export class AgentExecutorService implements OnModuleInit {
     ];
 
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const response = await client.models.generateContent({
-        model,
-        contents,
-        config: {
-          tools: [{ functionDeclarations }],
-          temperature: 0.2,
-        },
-      });
+      const response = await this.generateWithQuotaRetry(() =>
+        client.models.generateContent({
+          model,
+          contents,
+          config: {
+            tools: [{ functionDeclarations }],
+            temperature: 0.2,
+          },
+        }),
+      );
 
       const calls = response.functionCalls ?? [];
       if (calls.length === 0) {
@@ -248,5 +250,39 @@ export class AgentExecutorService implements OnModuleInit {
       output: `(stopped after ${MAX_TURNS} tool turns — partial work is in the trace)`,
       trace,
     };
+  }
+
+  /**
+   * Free-tier Gemini caps requests per minute; an agent loop burns one per
+   * turn. On 429, wait out the API's suggested retryDelay (capped) instead
+   * of failing the whole run.
+   */
+  private async generateWithQuotaRetry<T>(
+    fn: () => Promise<T>,
+    attempts = 4,
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('429') && !message.includes('RESOURCE_EXHAUSTED')) {
+          throw error;
+        }
+        if (attempt === attempts) break;
+        const suggested = /retry in ([0-9.]+)s/i.exec(message)?.[1];
+        const waitMs = Math.min(
+          suggested ? Math.ceil(Number(suggested) * 1000) + 1000 : 30_000,
+          65_000,
+        );
+        this.logger.warn(
+          `Gemini quota hit (attempt ${attempt}/${attempts}) — waiting ${Math.round(waitMs / 1000)}s`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      }
+    }
+    throw lastError;
   }
 }

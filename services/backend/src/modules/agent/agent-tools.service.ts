@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Type } from '@google/genai';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
@@ -48,6 +49,7 @@ export class AgentToolsService {
     @Inject(DRIZZLE) db: RelayDb,
     @Inject(GITHUB_ISSUE_PUBLISHER) issues: GithubIssuePublisher,
     @Inject(MAILER) mailer: Mailer,
+    config: ConfigService,
     chat: ChatNotifier,
     knowledge: KnowledgeService,
     todos: TodoService,
@@ -55,6 +57,62 @@ export class AgentToolsService {
     timeline: TimelineService,
   ) {
     this.integrationTools = [
+      {
+        name: 'list_repo_issues',
+        description:
+          "List issues from the project's repository, filtered by state (open, closed, or all). Returns number, state, and title.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            state: {
+              type: Type.STRING,
+              description: 'open | closed | all (default all)',
+            },
+          },
+        },
+        execute: async (ctx, args) => {
+          const project = await db.query.projects.findFirst({
+            where: eq(projects.id, ctx.projectId),
+            columns: { githubRepo: true },
+          });
+          if (!project?.githubRepo) {
+            return 'This project has no repository configured.';
+          }
+          if (/^(gitlab|bitbucket):/.test(project.githubRepo)) {
+            return 'Issue listing is only supported for GitHub repositories so far.';
+          }
+          const token = config.get<string>('GITHUB_TOKEN');
+          if (!token) return 'GitHub is not connected (no token).';
+          const state = ['open', 'closed', 'all'].includes(str(args.state))
+            ? str(args.state)
+            : 'all';
+          const res = await fetch(
+            `https://api.github.com/repos/${project.githubRepo}/issues?state=${state}&per_page=30`,
+            {
+              headers: {
+                authorization: `Bearer ${token}`,
+                accept: 'application/vnd.github+json',
+                'user-agent': 'relay-backend',
+                'x-github-api-version': '2022-11-28',
+              },
+            },
+          );
+          if (!res.ok) {
+            return `GitHub issue listing failed (HTTP ${res.status}).`;
+          }
+          const data = (await res.json()) as {
+            number: number;
+            state: string;
+            title: string;
+            pull_request?: unknown;
+          }[];
+          const issuesOnly = data.filter((item) => !item.pull_request);
+          if (issuesOnly.length === 0) return `No ${state} issues found.`;
+          return issuesOnly
+            .map((item) => `#${item.number} [${item.state}] ${item.title}`)
+            .join('\n');
+        },
+      },
       {
         name: 'publish_issue',
         description:
@@ -215,11 +273,15 @@ export class AgentToolsService {
     ];
   }
 
-  /** Core tools always; integration tools only when the allowlist grants them. */
+  /** Core tools always; integration tools only when the allowlist grants them.
+   * The "publish_issue" grant means "issue tracker" — it includes the read
+   * side (list_repo_issues), so existing manifests need no migration. */
   select(allowlist: string[]): AgentTool[] {
+    const granted = new Set(allowlist);
+    if (granted.has('publish_issue')) granted.add('list_repo_issues');
     return [
       ...this.tools,
-      ...this.integrationTools.filter((tool) => allowlist.includes(tool.name)),
+      ...this.integrationTools.filter((tool) => granted.has(tool.name)),
     ];
   }
 
