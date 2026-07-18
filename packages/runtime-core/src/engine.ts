@@ -108,7 +108,7 @@ export class RuntimeEngine {
     );
   }
 
-  /** LangGraph agent definitions (agents/<id>.yaml). */
+  /** Agent definitions (agents/<id>.yaml). */
   get agents(): AgentRegistry {
     return new AgentRegistry(
       new ManifestStore(this.paths.agentsDir, agentManifestSchema, 'agent'),
@@ -140,7 +140,7 @@ export class RuntimeEngine {
     return manifest;
   }
 
-  /** Create an agent definition + LangGraph scaffold (relay agent new). */
+  /** Create an agent definition + starter scaffold (relay agent new). */
   async createAgent(input: CreateAgentInput): Promise<AgentManifest> {
     const manifest = await this.agents.create(input);
     await scaffoldAgent(this.paths.agentsDir, manifest);

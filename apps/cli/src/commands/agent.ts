@@ -12,7 +12,7 @@ interface NewOptions {
 }
 
 export function registerAgent(program: Command): void {
-  const agent = program.command('agent').description('Manage LangGraph agents');
+  const agent = program.command('agent').description('Manage agents');
 
   agent
     .command('new <id>')
@@ -49,7 +49,7 @@ export function registerAgent(program: Command): void {
           workflow: options.workflow,
           memory,
         });
-        p.log.success(`Created agent "${manifest.id}" (+ LangGraph scaffold)`);
+        p.log.success(`Created agent "${manifest.id}" (+ scaffold)`);
       });
     });
 

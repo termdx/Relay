@@ -21,9 +21,11 @@ export async function scaffoldAgent(
     `# ${manifest.name}\n\n${manifest.description ?? ''}\n\n- Model: \`${manifest.model}\`\n- Tools: ${manifest.tools.join(', ') || 'none'}\n- Memory: ${manifest.memory.kind}\n`,
     'utf8',
   );
+  // Framework-neutral stub: agent loops run as orchestration activities using
+  // the provider SDK's native tool-calling (ai.md) — no agent framework.
   await writeFile(
-    join(dir, 'agent.py'),
-    `"""LangGraph agent: ${manifest.name}\nModel: ${manifest.model}\n"""\n\n# TODO: implement the ${manifest.id} agent graph.\n\n\ndef build_agent():\n    raise NotImplementedError("Implement the ${manifest.id} agent")\n`,
+    join(dir, 'agent.ts'),
+    `/** Agent: ${manifest.name}\n * Model: ${manifest.model}\n */\n\n// TODO: implement the ${manifest.id} agent loop.\n\nexport function buildAgent(): never {\n  throw new Error('Implement the ${manifest.id} agent');\n}\n`,
     'utf8',
   );
   return dir;

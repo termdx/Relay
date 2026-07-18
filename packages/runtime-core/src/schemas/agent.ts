@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { configSchema, idSchema, versionSchema } from './common';
 
-/** agents/<id>.yaml — a LangGraph agent definition (scaffolded by the runtime). */
+/** agents/<id>.yaml — an agent definition (scaffolded by the runtime). */
 export const agentManifestSchema = z.object({
   kind: z.literal('agent').default('agent'),
   id: idSchema,

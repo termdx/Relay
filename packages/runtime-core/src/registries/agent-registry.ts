@@ -12,7 +12,7 @@ export interface CreateAgentInput {
   memory?: 'none' | 'buffer' | 'vector';
 }
 
-/** Manages LangGraph agent definitions (agents/<id>.yaml). */
+/** Manages agent definitions (agents/<id>.yaml). */
 export class AgentRegistry {
   constructor(private readonly store: ManifestStore<AgentManifest>) {}
 
