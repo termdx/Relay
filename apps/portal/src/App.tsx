@@ -494,32 +494,45 @@ function Stat({
   );
 }
 
-/** Single-series bar chart: violet accent, rounded data-ends, hover values. */
+/** Single-series bar chart: violet accent, rounded data-ends, hover values.
+ * The plot area has a FIXED height (percentage heights inside flex-sized
+ * parents collapse unpredictably); zero weeks show a baseline stub, not a
+ * tiny violet bar pretending to be data. */
 function ActivityChart({ weeks }: { weeks: { weekStart: string; events: number }[] }) {
   if (weeks.length === 0) {
     return <EmptyNote className="mt-3">Nothing tracked in the last 8 weeks yet.</EmptyNote>;
   }
   const max = Math.max(...weeks.map((w) => w.events), 1);
   return (
-    <div className="mt-4 flex h-32 items-end gap-[2px]">
-      {weeks.map((week) => {
-        const height = Math.max((week.events / max) * 100, 4);
-        const label = new Date(week.weekStart).toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-        });
+    <div className="mt-4 flex gap-1">
+      {weeks.map((week, index) => {
+        const pct = week.events === 0 ? 0 : Math.max((week.events / max) * 100, 8);
+        // weekStart is a plain date — pin parsing and display to UTC so the
+        // label can't drift a day in negative-offset timezones.
+        const label = new Date(`${week.weekStart}T00:00:00Z`).toLocaleDateString(
+          undefined,
+          { month: "short", day: "numeric", timeZone: "UTC" },
+        );
         return (
-          <div key={week.weekStart} className="group flex h-full flex-1 flex-col justify-end gap-1.5">
-            <div className="relative flex w-full flex-1 items-end">
-              <div
-                className="w-full rounded-t-[4px] bg-primary transition-opacity group-hover:opacity-80"
-                style={{ height: `${height}%` }}
-              />
+          <div key={week.weekStart} className="group flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="relative flex h-24 items-end">
+              {week.events === 0 ? (
+                <div className="h-[2px] w-full rounded bg-border" />
+              ) : (
+                <div
+                  className="w-full rounded-t-[4px] bg-primary transition-opacity group-hover:opacity-80"
+                  style={{ height: `${pct}%` }}
+                />
+              )}
               <span className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-background opacity-0 transition-opacity group-hover:opacity-100">
                 {week.events}
               </span>
             </div>
-            <span className="text-center text-[10px] tabular-nums text-muted-foreground">{label}</span>
+            <span
+              className={`truncate text-center text-[10px] tabular-nums text-muted-foreground ${index % 2 === 1 ? "hidden sm:block" : ""}`}
+            >
+              {label}
+            </span>
           </div>
         );
       })}

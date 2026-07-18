@@ -149,24 +149,31 @@ export class PortalService {
     const typeCount = (type: string) =>
       typeRows.find((r) => r.type === type)?.count ?? 0;
 
-    const weekly = await this.db
-      .select({
-        weekStart: sql<string>`to_char(date_trunc('week', ${timelineEvents.occurredAt}), 'YYYY-MM-DD')`,
-        events: sql<number>`count(*)::int`,
-      })
-      .from(timelineEvents)
-      .where(
-        and(
-          eq(timelineEvents.projectId, projectId),
-          gte(
-            timelineEvents.occurredAt,
-            new Date(Date.now() - 8 * 7 * 24 * 60 * 60 * 1000),
-          ),
-          inArray(timelineEvents.type, CLIENT_SAFE_EVENTS),
-        ),
-      )
-      .groupBy(sql`date_trunc('week', ${timelineEvents.occurredAt})`)
-      .orderBy(sql`date_trunc('week', ${timelineEvents.occurredAt})`);
+    // Zero-filled: always exactly 8 rows, oldest → newest — a chart with
+    // only "weeks that had events" renders one giant bar on young projects.
+    const typeList = sql.join(
+      CLIENT_SAFE_EVENTS.map((type) => sql`${type}`),
+      sql`, `,
+    );
+    const weeklyResult = await this.db.execute<{
+      weekStart: string;
+      events: number;
+    }>(sql`
+      SELECT to_char(w, 'YYYY-MM-DD') AS "weekStart",
+             coalesce(count(te.id), 0)::int AS "events"
+      FROM generate_series(
+        date_trunc('week', now()) - interval '7 weeks',
+        date_trunc('week', now()),
+        interval '1 week'
+      ) AS w
+      LEFT JOIN timeline_events te
+        ON date_trunc('week', te.occurred_at) = w
+       AND te.project_id = ${projectId}
+       AND te.type IN (${typeList})
+      GROUP BY w
+      ORDER BY w
+    `);
+    const weekly = weeklyResult.rows;
 
     const [latest] = await this.db
       .select({ at: timelineEvents.occurredAt })
