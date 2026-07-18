@@ -114,6 +114,62 @@ export class AgentToolsService {
         },
       },
       {
+        name: 'get_ci_status',
+        description:
+          "Latest CI results for the project's repository (GitHub Actions workflow runs): workflow name, branch, status, conclusion, and link.",
+        parameters: { type: Type.OBJECT, properties: {} },
+        execute: async (ctx) => {
+          const project = await db.query.projects.findFirst({
+            where: eq(projects.id, ctx.projectId),
+            columns: { githubRepo: true },
+          });
+          if (!project?.githubRepo) {
+            return 'This project has no repository configured.';
+          }
+          if (/^(gitlab|bitbucket):/.test(project.githubRepo)) {
+            return 'CI status is only supported for GitHub repositories so far.';
+          }
+          const token = config.get<string>('GITHUB_TOKEN');
+          if (!token) return 'GitHub is not connected (no token).';
+          const res = await fetch(
+            `https://api.github.com/repos/${project.githubRepo}/actions/runs?per_page=8`,
+            {
+              headers: {
+                authorization: `Bearer ${token}`,
+                accept: 'application/vnd.github+json',
+                'user-agent': 'relay-backend',
+                'x-github-api-version': '2022-11-28',
+              },
+            },
+          );
+          if (!res.ok) {
+            return `CI lookup failed (HTTP ${res.status}) — the repo may have no Actions workflows.`;
+          }
+          const data = (await res.json()) as {
+            workflow_runs?: {
+              name?: string;
+              head_branch?: string;
+              status?: string;
+              conclusion?: string | null;
+              html_url?: string;
+              updated_at?: string;
+            }[];
+          };
+          const runs = data.workflow_runs ?? [];
+          if (runs.length === 0) {
+            return 'No CI runs found — the repo has no GitHub Actions workflows yet.';
+          }
+          return runs
+            .map(
+              (run) =>
+                `${(run.updated_at ?? '').slice(0, 16).replace('T', ' ')} "${run.name}" on ${run.head_branch}: ${
+                  run.conclusion ?? run.status ?? 'unknown'
+                } — ${run.html_url}`,
+            )
+            .join('\n');
+        },
+      },
+      {
         name: 'publish_issue',
         description:
           "Create a real issue in the project's configured repository (GitHub/GitLab/Bitbucket).",
@@ -274,11 +330,14 @@ export class AgentToolsService {
   }
 
   /** Core tools always; integration tools only when the allowlist grants them.
-   * The "publish_issue" grant means "issue tracker" — it includes the read
-   * side (list_repo_issues), so existing manifests need no migration. */
+   * The "publish_issue" grant means "repo access" — it includes the read side
+   * (issue listing, CI status), so existing manifests need no migration. */
   select(allowlist: string[]): AgentTool[] {
     const granted = new Set(allowlist);
-    if (granted.has('publish_issue')) granted.add('list_repo_issues');
+    if (granted.has('publish_issue')) {
+      granted.add('list_repo_issues');
+      granted.add('get_ci_status');
+    }
     return [
       ...this.tools,
       ...this.integrationTools.filter((tool) => granted.has(tool.name)),
