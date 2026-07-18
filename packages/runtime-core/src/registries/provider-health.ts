@@ -53,6 +53,19 @@ export async function probeProvider(
           .filter((n): n is string => Boolean(n));
         return { id: manifest.id, status: 'ok', models };
       }
+      case 'huggingface': {
+        if (!apiKey) {
+          return { id: manifest.id, status: 'error', detail: 'no API key configured' };
+        }
+        const res = await fetch('https://huggingface.co/api/whoami-v2', {
+          headers: { authorization: `Bearer ${apiKey}` },
+        });
+        if (!res.ok) {
+          return { id: manifest.id, status: 'error', detail: `HTTP ${res.status} — token rejected` };
+        }
+        // The HF catalog is unbounded; models are chosen by name, not probed.
+        return { id: manifest.id, status: 'ok', models: [] };
+      }
       default:
         return {
           id: manifest.id,

@@ -55,6 +55,14 @@ export function aiProviderEnv(
         // name here rotted once already (2.5-flash got gated for new keys).
         GEMINI_MODEL: provider.defaultModel ?? 'gemini-flash-latest',
       };
+    case 'huggingface':
+      return {
+        AI_PROVIDER: 'huggingface',
+        HF_TOKEN: apiKey ?? '',
+        HF_MODEL: provider.defaultModel ?? 'meta-llama/Llama-3.3-70B-Instruct',
+        // Must be 768-dim to match the knowledge base's pgvector column.
+        HF_EMBED_MODEL: 'sentence-transformers/all-mpnet-base-v2',
+      };
     case 'ollama':
       return {
         AI_PROVIDER: 'ollama',

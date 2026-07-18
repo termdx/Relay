@@ -263,13 +263,17 @@ export class RuntimeEngine {
     }
     const provider = defaultProvider(providers);
     const apiKey = provider ? await this.ai.resolveApiKey(provider) : undefined;
-    Object.assign(env, aiProviderEnv(provider, apiKey));
+    const aiEnv = aiProviderEnv(provider, apiKey);
+    Object.assign(env, aiEnv);
 
     // Installed integrations: resolve each credential secret into an env var
     // (github.token → GITHUB_TOKEN) so adapters select themselves by config.
     // Track the keys — they're injected into the compose services directly,
     // so already-installed module manifests need no reinstall to pick them up.
-    const integrationEnvKeys: string[] = [];
+    // AI env keys are injected into compose services alongside integration
+    // credentials — installed module manifests never need reinstalling to
+    // pick up a newly supported provider's variables.
+    const integrationEnvKeys: string[] = [...Object.keys(aiEnv)];
     const installedIntegrations = await this.integrations.list();
     for (const integration of installedIntegrations) {
       for (const field of integration.credentials) {

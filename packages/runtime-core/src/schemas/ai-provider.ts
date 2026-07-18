@@ -3,6 +3,7 @@ import { idSchema, secretRefSchema, versionSchema } from './common';
 
 export const AI_PROVIDER_KINDS = [
   'gemini',
+  'huggingface',
   'openai',
   'anthropic',
   'ollama',

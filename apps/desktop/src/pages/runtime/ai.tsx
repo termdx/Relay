@@ -25,8 +25,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { runtime, RuntimeError } from "@/lib/api/runtime";
 import { useRuntimeWorkspace } from "@/lib/runtime-workspace";
 
-const PROVIDERS = ["gemini", "openai", "anthropic", "ollama", "openrouter"];
-const KEYED = new Set(["gemini", "openai", "anthropic", "openrouter"]);
+const PROVIDERS = ["gemini", "huggingface", "openai", "anthropic", "ollama", "openrouter"];
+const KEYED = new Set(["gemini", "huggingface", "openai", "anthropic", "openrouter"]);
 
 export function RuntimeAiPage() {
   const { root } = useRuntimeWorkspace();
@@ -252,7 +252,13 @@ function AddProviderDialog({
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder={provider === "gemini" ? "gemini-flash-latest" : ""}
+              placeholder={
+                provider === "gemini"
+                  ? "gemini-flash-latest"
+                  : provider === "huggingface"
+                    ? "meta-llama/Llama-3.3-70B-Instruct"
+                    : ""
+              }
             />
           </div>
           {needsKey && (

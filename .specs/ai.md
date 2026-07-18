@@ -20,10 +20,14 @@ runtime secret store.
 
 ## Providers
 
-Gemini is wired today. The provider registry is designed for more (OpenAI,
-Anthropic, Ollama, OpenRouter, …) — each is a manifest plus an adapter per
-capability. A gateway (LiteLLM) may later slot in as a single adapter if
-provider sprawl warrants it; it is not a prerequisite.
+Wired today: **Gemini** (draft/chat/embed + agent function calling) and
+**Hugging Face** (draft/chat/embed via the OpenAI-compatible router; embed
+uses a 768-dim sentence-transformers model to match the pgvector column;
+agents still require Gemini for reliable tool calling). The registry is
+designed for more (OpenAI, Anthropic, Ollama, OpenRouter, …) — each is a
+manifest plus an adapter per capability. A gateway (LiteLLM) may later slot
+in as a single adapter if provider sprawl warrants it; it is not a
+prerequisite.
 
 ## Agents (executor)
 

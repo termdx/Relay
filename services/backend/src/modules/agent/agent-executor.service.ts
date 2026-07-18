@@ -160,8 +160,19 @@ export class AgentExecutorService implements OnModuleInit {
     const available = this.tools.select(run.tools);
     const trace: ToolTraceEntry[] = [];
 
+    const aiProvider = this.config
+      .get<string>('AI_PROVIDER', 'stub')
+      .toLowerCase();
+    if (aiProvider === 'huggingface') {
+      // Honest failure beats a silent stub: agent runs need reliable
+      // function calling, which the HF adapters don't provide yet.
+      throw new Error(
+        'Agent runs currently require the Gemini provider (function calling). ' +
+          'Hugging Face powers drafts, chat, and embeddings — add a Gemini provider to run agents.',
+      );
+    }
     // Offline path: prove the plumbing without a model — one retrieval, done.
-    if (this.config.get<string>('AI_PROVIDER', 'stub').toLowerCase() !== 'gemini') {
+    if (aiProvider !== 'gemini') {
       const search = this.tools.find('search_knowledge');
       let found = 'knowledge tool unavailable';
       if (search && available.some((t) => t.name === 'search_knowledge')) {
