@@ -244,31 +244,31 @@ export class MeetingService {
       return;
     }
 
-    // Publish only what hasn't landed yet; a retry resumes where it failed.
-    const unpublished = meeting.tasks.filter((task) => !task.githubIssueUrl);
-    const published = await this.issuePublisher.publishIssues(
-      meeting.githubRepo,
-      unpublished.map((task) => ({
-        title: task.title,
-        body: task.body,
-        assignee: task.assignee,
-      })),
-    );
-    const urlByTaskId = new Map(
-      unpublished.map((task, index) => [task.id, published[index]?.url ?? null]),
-    );
+    // Publish per task and record each URL IMMEDIATELY — a mid-batch failure
+    // (bad assignee, rate limit) resumes at the exact unpublished task on
+    // outbox retry; already-created issues are never re-created.
+    const urlByTaskId = new Map<string, string>();
+    let publishedCount = 0;
+    for (const task of meeting.tasks) {
+      if (task.githubIssueUrl) {
+        urlByTaskId.set(task.id, task.githubIssueUrl);
+        continue;
+      }
+      const [issue] = await this.issuePublisher.publishIssues(
+        meeting.githubRepo,
+        [{ title: task.title, body: task.body, assignee: task.assignee }],
+      );
+      if (issue) {
+        await this.db
+          .update(meetingTasks)
+          .set({ githubIssueUrl: issue.url })
+          .where(eq(meetingTasks.id, task.id));
+        urlByTaskId.set(task.id, issue.url);
+        publishedCount += 1;
+      }
+    }
 
     await this.db.transaction(async (tx) => {
-      await Promise.all(
-        published.map((issue, index) => {
-          const task = unpublished[index];
-          if (!task) return Promise.resolve();
-          return tx
-            .update(meetingTasks)
-            .set({ githubIssueUrl: issue.url })
-            .where(eq(meetingTasks.id, task.id));
-        }),
-      );
       await tx
         .update(meetings)
         .set({ status: 'APPROVED', clientComment: comment })
@@ -291,7 +291,7 @@ export class MeetingService {
     });
 
     this.logger.log(
-      `Meeting ${meetingId} approved — ${published.length} tasks pushed to ${meeting.githubRepo}.`,
+      `Meeting ${meetingId} approved — ${publishedCount} task(s) pushed to ${meeting.githubRepo}.`,
     );
 
     this.events.emit({
@@ -305,7 +305,7 @@ export class MeetingService {
         comment,
         // The approved summary is prime knowledge-engine material.
         summary: meeting.summary,
-        publishedIssues: published.map((issue) => issue.url),
+        publishedIssues: [...urlByTaskId.values()],
       },
     });
   }
