@@ -11,8 +11,8 @@ from runtime manifests (`ai/<id>.yaml`):
 | Capability | Purpose | Status |
 |---|---|---|
 | draft | Transcript → summary + task list (meeting module) | shipped (Gemini + stub) |
-| chat | Grounded Q&A over retrieved knowledge (portal, desktop) | planned |
-| embed | Chunk embeddings for the knowledge base (pgvector) | planned |
+| chat | Grounded Q&A over retrieved knowledge (portal, desktop) | shipped (Gemini + stub) |
+| embed | Chunk embeddings for the knowledge base (pgvector, 768-dim) | shipped (Gemini + stub) |
 
 Modules declare `requiredAiCapabilities`; the runtime's dependency resolver
 enforces that an installed provider covers them. Provider API keys live in the

@@ -44,5 +44,10 @@ grounded generation (ai `chat` capability) — Relay AI answers with citations
 
 ## Status
 
-Planned. Prerequisites in order: client/project entities, timeline events,
-`embed` capability on an AI provider. pgvector is already enabled in Postgres.
+Shipped (v1): firehose ingestion with per-event-type rendering, 768-dim
+embeddings (Gemini `gemini-embedding-001` / deterministic stub), pgvector
+HNSW retrieval scoped by project in SQL, grounded answers with citations
+(`POST /projects/:id/ask`), and idempotent timeline replay
+(`POST /knowledge/reindex`, content-hash dedup). Consumers: the desktop
+"Ask Relay" card today; the client portal chat next (same engine,
+client-scoped in the WHERE clause).

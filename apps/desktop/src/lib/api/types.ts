@@ -100,6 +100,19 @@ export interface Decision {
   createdAt: string;
 }
 
+export interface AskSource {
+  ref: number;
+  cited: boolean;
+  snippet: string;
+  type: string;
+  occurredAt: string;
+}
+
+export interface AskResult {
+  answer: string;
+  sources: AskSource[];
+}
+
 export type MeetingStatus =
   | "DRAFTED"
   | "PENDING_APPROVAL"

@@ -1,17 +1,36 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ANSWERER, type Answerer } from './answerer';
 import { DRAFT_GENERATOR, type DraftGenerator } from './draft-generator';
+import { EMBEDDER, type Embedder } from './embedder';
+import { GeminiAnswerer } from './gemini-answerer';
 import { GeminiDraftGenerator } from './gemini-draft-generator';
+import { GeminiEmbedder } from './gemini-embedder';
+import { StubAnswerer } from './stub-answerer';
 import { StubDraftGenerator } from './stub-draft-generator';
+import { StubEmbedder } from './stub-embedder';
 
 /**
- * AI module — owns the AI seam. The concrete DraftGenerator is chosen by the
- * AI_PROVIDER config value (the honest v0.1 form of `ai.md`'s gateway: one
- * stable contract, config-selected implementation, no consumer changes).
+ * AI module — owns the AI seam. Three capability ports (ai.md): draft, chat
+ * (ANSWERER), embed. Each is chosen by AI_PROVIDER, with a stub keeping every
+ * flow working offline:
  *
- *   AI_PROVIDER=stub    -> deterministic placeholder (default, no network)
+ *   AI_PROVIDER=stub    -> deterministic placeholders (default, no network)
  *   AI_PROVIDER=gemini  -> Google Gemini (requires GEMINI_API_KEY)
  */
+
+function geminiKey(config: ConfigService): string {
+  const apiKey = config.get<string>('GEMINI_API_KEY');
+  if (!apiKey) {
+    throw new Error('AI_PROVIDER=gemini but GEMINI_API_KEY is not set.');
+  }
+  return apiKey;
+}
+
+function provider(config: ConfigService): string {
+  return config.get<string>('AI_PROVIDER', 'stub').toLowerCase();
+}
+
 @Module({
   providers: [
     {
@@ -19,27 +38,47 @@ import { StubDraftGenerator } from './stub-draft-generator';
       inject: [ConfigService],
       useFactory: (config: ConfigService): DraftGenerator => {
         const logger = new Logger('AiModule');
-        const provider = config
-          .get<string>('AI_PROVIDER', 'stub')
-          .toLowerCase();
-
-        if (provider === 'gemini') {
-          const apiKey = config.get<string>('GEMINI_API_KEY');
-          if (!apiKey) {
-            throw new Error(
-              'AI_PROVIDER=gemini but GEMINI_API_KEY is not set.',
-            );
-          }
+        if (provider(config) === 'gemini') {
           const model = config.get<string>('GEMINI_MODEL', 'gemini-flash-latest');
           logger.log(`DraftGenerator: Gemini (${model})`);
-          return new GeminiDraftGenerator(apiKey, model);
+          return new GeminiDraftGenerator(geminiKey(config), model);
         }
-
         logger.log('DraftGenerator: stub (placeholder output)');
         return new StubDraftGenerator();
       },
     },
+    {
+      provide: EMBEDDER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): Embedder => {
+        const logger = new Logger('AiModule');
+        if (provider(config) === 'gemini') {
+          const model = config.get<string>(
+            'GEMINI_EMBED_MODEL',
+            'gemini-embedding-001',
+          );
+          logger.log(`Embedder: Gemini (${model})`);
+          return new GeminiEmbedder(geminiKey(config), model);
+        }
+        logger.log('Embedder: stub (hash-based vectors)');
+        return new StubEmbedder();
+      },
+    },
+    {
+      provide: ANSWERER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): Answerer => {
+        const logger = new Logger('AiModule');
+        if (provider(config) === 'gemini') {
+          const model = config.get<string>('GEMINI_MODEL', 'gemini-flash-latest');
+          logger.log(`Answerer: Gemini (${model})`);
+          return new GeminiAnswerer(geminiKey(config), model);
+        }
+        logger.log('Answerer: stub (quotes context)');
+        return new StubAnswerer();
+      },
+    },
   ],
-  exports: [DRAFT_GENERATOR],
+  exports: [DRAFT_GENERATOR, EMBEDDER, ANSWERER],
 })
 export class AiModule {}

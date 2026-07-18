@@ -13,6 +13,7 @@ import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { ClientModule } from './modules/client/client.module';
 import { DecisionModule } from './modules/decision/decision.module';
 import { GithubModule } from './modules/integration/github/github.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { MeetingModule } from './modules/meeting/meeting.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
@@ -37,6 +38,7 @@ import { TodoModule } from './modules/todo/todo.module';
     TimelineModule,
     TodoModule,
     DecisionModule,
+    KnowledgeModule,
     NotificationModule,
     AiModule,
     GithubModule,

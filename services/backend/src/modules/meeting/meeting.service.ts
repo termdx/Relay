@@ -303,6 +303,8 @@ export class MeetingService {
         meetingId,
         title: meeting.title,
         comment,
+        // The approved summary is prime knowledge-engine material.
+        summary: meeting.summary,
         publishedIssues: published.map((issue) => issue.url),
       },
     });

@@ -29,7 +29,11 @@ export class DecisionService {
       projectId,
       actor: { kind: 'user', id: 'owner' },
       source: 'decision',
-      payload: { decisionId: decision!.id, title: decision!.title },
+      payload: {
+        decisionId: decision!.id,
+        title: decision!.title,
+        detail: decision!.detail,
+      },
     });
     return decision!;
   }

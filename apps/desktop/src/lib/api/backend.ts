@@ -1,5 +1,6 @@
 import { backendRequest } from "./http";
 import type {
+  AskResult,
   AuthResult,
   Client,
   ClientWithProjects,
@@ -63,6 +64,18 @@ export const backend = {
       }),
     timeline: (id: string) =>
       backendRequest<TimelineEvent[]>(`/projects/${id}/timeline`),
+    ask: (id: string, question: string) =>
+      backendRequest<AskResult>(`/projects/${id}/ask`, {
+        method: "POST",
+        body: { question },
+      }),
+  },
+  knowledge: {
+    reindex: () =>
+      backendRequest<{ scanned: number; added: number }>(
+        "/knowledge/reindex",
+        { method: "POST" },
+      ),
   },
   todos: {
     list: (projectId: string) =>

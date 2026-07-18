@@ -9,6 +9,7 @@ import {
   Gavel,
   Plug,
   Plus,
+  Sparkles,
   User,
 } from "lucide-react";
 import * as React from "react";
@@ -130,6 +131,8 @@ export function ProjectDetailPage() {
           </p>
         ) : null}
 
+        <AskSection projectId={p.id} />
+
         <div className="mb-8 grid gap-8 lg:grid-cols-2">
           <TodosSection projectId={p.id} />
           <DecisionsSection projectId={p.id} />
@@ -164,6 +167,65 @@ export function ProjectDetailPage() {
         )}
       </div>
     </>
+  );
+}
+
+function AskSection({ projectId }: { projectId: string }) {
+  const [question, setQuestion] = React.useState("");
+  const ask = useMutation({
+    mutationFn: (q: string) => backend.projects.ask(projectId, q),
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : "Ask failed"),
+  });
+
+  return (
+    <section className="mb-8 rounded-lg border border-border bg-card p-4">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <Sparkles className="size-4 text-primary" />
+        Ask Relay
+      </h2>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (question.trim()) ask.mutate(question.trim());
+        }}
+      >
+        <Input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="What shipped this week? Why did we choose X? When is the demo?"
+        />
+        <Button type="submit" disabled={ask.isPending} aria-label="Ask">
+          {ask.isPending ? <Spinner className="size-4" /> : "Ask"}
+        </Button>
+      </form>
+
+      {ask.data ? (
+        <div className="mt-4 flex flex-col gap-3">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {ask.data.answer}
+          </p>
+          {ask.data.sources.some((s) => s.cited) ? (
+            <div className="flex flex-col gap-1 border-t border-border pt-3">
+              {ask.data.sources
+                .filter((s) => s.cited)
+                .map((s) => (
+                  <div
+                    key={s.ref}
+                    className="flex items-baseline gap-2 text-xs text-muted-foreground"
+                  >
+                    <span className="shrink-0 font-mono text-primary">
+                      [{s.ref}]
+                    </span>
+                    <span className="min-w-0 truncate">{s.snippet}</span>
+                  </div>
+                ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

@@ -15,7 +15,7 @@ event-driven communication between them.
 | approval | Snapshot + magic-link decisions (generalizes beyond meetings) | shipped |
 | todo | Project todos — manual or synced from approved meetings | shipped |
 | decision | First-class decision records (what/who/when/source) | shipped |
-| knowledge | Ingestion + retrieval over pgvector; the source of truth | planned |
+| knowledge | Ingestion + retrieval over pgvector; the source of truth | shipped |
 | notification | Outbound email via Mailer port (SMTP/stub); Slack/Discord later | email shipped |
 | storage | File/image uploads to S3-compatible object storage | planned |
 | outbox | Transactional outbox: durable, retried external side effects | shipped |

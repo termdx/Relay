@@ -62,7 +62,7 @@ bundles the daemon as a sidecar. See `runtime.md`.
 | GitHub webhooks in → timeline (+ todo auto-complete) | shipped |
 | Todos & decisions entities (meeting tasks sync into todos) | shipped |
 | SMTP mailer + approval email (durable via outbox) | shipped |
+| Knowledge engine (embed/chat capabilities, ingest + reindex + scoped ask) | shipped |
 | Remaining adapters (GitLab, Bitbucket, Slack, Discord, GCal, S3) | planned |
-| Knowledge engine | planned |
-| Client portal + Relay AI chat | planned |
+| Client portal + Relay AI chat (re-uses the ask surface, client-scoped) | planned |
 | Temporal | planned — subsumes the outbox |
