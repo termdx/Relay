@@ -1,7 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Type } from '@google/genai';
+import { eq } from 'drizzle-orm';
+import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
+import { users } from '../auth/auth.schema';
 import { DecisionService } from '../decision/decision.service';
+import {
+  GITHUB_ISSUE_PUBLISHER,
+  type GithubIssuePublisher,
+} from '../integration/github/github-issue-publisher';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { ChatNotifier } from '../notification/chat-notifier';
+import { MAILER, type Mailer } from '../notification/mailer';
+import { projects } from '../project/project.schema';
 import { TimelineService } from '../timeline/timeline.service';
 import { TodoService } from '../todo/todo.service';
 
@@ -23,21 +33,101 @@ interface AgentTool {
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 /**
- * The tools an agent may call — Relay's own data, always scoped to the run's
- * project, writes attributed to the agent (ai actor on the timeline). This
- * registry is the whole capability surface; there is no filesystem, network,
- * or cross-project reach.
+ * The tools an agent may call. CORE tools (Relay's own data, scoped to the
+ * run's project) are always available; INTEGRATION tools (issue tracker,
+ * team chat, email) exist only when the agent's allowlist grants them — the
+ * allowlist is the owner's consent. This registry is the whole capability
+ * surface; there is no filesystem, network, or cross-project reach.
  */
 @Injectable()
 export class AgentToolsService {
   private readonly tools: AgentTool[];
+  private readonly integrationTools: AgentTool[];
 
   constructor(
+    @Inject(DRIZZLE) db: RelayDb,
+    @Inject(GITHUB_ISSUE_PUBLISHER) issues: GithubIssuePublisher,
+    @Inject(MAILER) mailer: Mailer,
+    chat: ChatNotifier,
     knowledge: KnowledgeService,
     todos: TodoService,
     decisions: DecisionService,
     timeline: TimelineService,
   ) {
+    this.integrationTools = [
+      {
+        name: 'publish_issue',
+        description:
+          "Create a real issue in the project's configured repository (GitHub/GitLab/Bitbucket).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            body: { type: Type.STRING },
+          },
+          required: ['title'],
+        },
+        execute: async (ctx, args) => {
+          const project = await db.query.projects.findFirst({
+            where: eq(projects.id, ctx.projectId),
+            columns: { githubRepo: true },
+          });
+          if (!project?.githubRepo) {
+            return 'This project has no repository configured.';
+          }
+          const [issue] = await issues.publishIssues(project.githubRepo, [
+            {
+              title: str(args.title),
+              body: `${str(args.body)}\n\n_Filed by agent ${ctx.agentId} via Relay._`,
+            },
+          ]);
+          return `Created issue: ${issue?.url ?? 'unknown url'}`;
+        },
+      },
+      {
+        name: 'notify_team',
+        description:
+          'Post a short message to the team chat (Slack/Discord, whichever is connected).',
+        parameters: {
+          type: Type.OBJECT,
+          properties: { message: { type: Type.STRING } },
+          required: ['message'],
+        },
+        execute: async (ctx, args) => {
+          if (!chat.hasSinks()) return 'No team chat is connected.';
+          await chat.send(`🤖 ${str(args.message)} — agent ${ctx.agentId}`);
+          return 'Posted to team chat.';
+        },
+      },
+      {
+        name: 'email_owner',
+        description:
+          "Email a report to the workspace owner (never to clients — client email always goes through the approval flow).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            subject: { type: Type.STRING },
+            body: { type: Type.STRING },
+          },
+          required: ['subject', 'body'],
+        },
+        execute: async (ctx, args) => {
+          const [owner] = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.role, 'owner'))
+            .limit(1);
+          if (!owner) return 'No workspace owner found.';
+          await mailer.send({
+            to: owner.email,
+            subject: `[${ctx.agentId}] ${str(args.subject)}`,
+            text: str(args.body),
+          });
+          return `Emailed the owner (${owner.email}).`;
+        },
+      },
+    ];
+
     this.tools = [
       {
         name: 'search_knowledge',
@@ -125,13 +215,17 @@ export class AgentToolsService {
     ];
   }
 
-  /** Tools visible to a run: manifest allowlist, or all when unspecified. */
+  /** Core tools always; integration tools only when the allowlist grants them. */
   select(allowlist: string[]): AgentTool[] {
-    if (allowlist.length === 0) return this.tools;
-    return this.tools.filter((tool) => allowlist.includes(tool.name));
+    return [
+      ...this.tools,
+      ...this.integrationTools.filter((tool) => allowlist.includes(tool.name)),
+    ];
   }
 
   find(name: string): AgentTool | undefined {
-    return this.tools.find((tool) => tool.name === name);
+    return [...this.tools, ...this.integrationTools].find(
+      (tool) => tool.name === name,
+    );
   }
 }

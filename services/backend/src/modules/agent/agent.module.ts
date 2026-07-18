@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { DecisionModule } from '../decision/decision.module';
+import { GithubModule } from '../integration/github/github.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { NotificationModule } from '../notification/notification.module';
 import { TimelineModule } from '../timeline/timeline.module';
 import { TodoModule } from '../todo/todo.module';
 import { AgentExecutorService } from './agent-executor.service';
@@ -8,7 +10,14 @@ import { AgentRunController, AgentRunService } from './agent-run.controller';
 import { AgentToolsService } from './agent-tools.service';
 
 @Module({
-  imports: [KnowledgeModule, TodoModule, DecisionModule, TimelineModule],
+  imports: [
+    KnowledgeModule,
+    TodoModule,
+    DecisionModule,
+    TimelineModule,
+    GithubModule,
+    NotificationModule,
+  ],
   controllers: [AgentRunController],
   providers: [AgentToolsService, AgentExecutorService, AgentRunService],
 })

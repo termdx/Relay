@@ -41,6 +41,8 @@ export function RuntimeAgentsPage() {
     id: string;
     name: string;
     model: string;
+    mission?: string;
+    projects?: string[];
     tools?: string[];
   } | null>(null);
 
@@ -118,9 +120,7 @@ export function RuntimeAgentsPage() {
                 title={a.id}
                 meta={`${a.model}${a.workflow ? ` · ${a.workflow}` : ""}`}
                 onRemove={() => removeAgent.mutate(a.id)}
-                onRun={() =>
-                  setRunning({ id: a.id, name: a.name, model: a.model })
-                }
+                onRun={() => setRunning(a)}
               />
             ))}
           </div>
@@ -183,8 +183,170 @@ function Row({
   );
 }
 
-/** Run an agent against a project and watch the tool loop live. */
+/** Frictionless run: an agent with a mission + projects starts immediately —
+ * one run per bound project, watched live. Legacy agents without a mission
+ * fall back to the manual form below. */
 function RunAgentDialog({
+  agent,
+  onClose,
+}: {
+  agent: {
+    id: string;
+    name: string;
+    model: string;
+    mission?: string;
+    projects?: string[];
+    tools?: string[];
+  };
+  onClose: () => void;
+}) {
+  if (agent.mission && (agent.projects?.length ?? 0) > 0) {
+    return <MissionRunDialog agent={agent} onClose={onClose} />;
+  }
+  return <ManualRunDialog agent={agent} onClose={onClose} />;
+}
+
+function MissionRunDialog({
+  agent,
+  onClose,
+}: {
+  agent: {
+    id: string;
+    name: string;
+    model: string;
+    mission?: string;
+    projects?: string[];
+    tools?: string[];
+  };
+  onClose: () => void;
+}) {
+  const [runIds, setRunIds] = React.useState<Record<string, string>>({});
+  const [failed, setFailed] = React.useState<Record<string, string>>({});
+  const started = React.useRef(false);
+
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: backend.projects.list,
+  });
+  const bound = (agent.projects ?? []).filter((id) =>
+    (projects.data ?? []).some((p) => p.id === id),
+  );
+
+  // Fire immediately — the mission IS the input.
+  React.useEffect(() => {
+    if (started.current || !projects.data) return;
+    started.current = true;
+    for (const projectId of bound) {
+      backend.agentRuns
+        .create({
+          agentId: agent.id,
+          agentName: agent.name,
+          model: agent.model,
+          tools: agent.tools,
+          projectId,
+          instruction: agent.mission!,
+        })
+        .then((run) => setRunIds((m) => ({ ...m, [projectId]: run.id })))
+        .catch((e: unknown) =>
+          setFailed((m) => ({
+            ...m,
+            [projectId]: e instanceof ApiError ? e.message : "Could not start",
+          })),
+        );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects.data]);
+
+  const projectName = (id: string) => {
+    const p = projects.data?.find((x) => x.id === id);
+    return p ? `${p.client.name} — ${p.name}` : id;
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{agent.name} is working</DialogTitle>
+          <DialogDescription className="line-clamp-2">
+            {agent.mission}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+          {bound.map((projectId) => (
+            <div key={projectId} className="rounded-md border border-border p-3">
+              <div className="mb-1.5 text-sm font-medium">{projectName(projectId)}</div>
+              {failed[projectId] ? (
+                <p className="text-sm text-destructive">{failed[projectId]}</p>
+              ) : runIds[projectId] ? (
+                <RunProgress runId={runIds[projectId]!} />
+              ) : (
+                <Spinner className="size-4" />
+              )}
+            </div>
+          ))}
+          {bound.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              None of this agent's projects exist anymore — edit its manifest.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Live status + trace + output for one run. */
+function RunProgress({ runId }: { runId: string }) {
+  const run = useQuery({
+    queryKey: ["agent-run", runId],
+    queryFn: () => backend.agentRuns.get(runId),
+    refetchInterval: (q) => {
+      const status = (q.state.data as AgentRun | undefined)?.status;
+      return status === "DONE" || status === "FAILED" ? false : 1500;
+    },
+  });
+  const r = run.data;
+  if (!r) return <Spinner className="size-4" />;
+  return (
+    <div className="flex flex-col gap-2">
+      {(r.status === "QUEUED" || r.status === "RUNNING") && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Spinner className="size-3.5" />
+          {r.status === "RUNNING" ? "Working…" : "Queued…"}
+          {r.trace.length > 0 && ` · ${r.trace.length} tool call(s)`}
+        </div>
+      )}
+      {r.trace.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {r.trace.map((t, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+            >
+              <Wrench className="size-2.5" />
+              {t.tool}
+            </span>
+          ))}
+        </div>
+      )}
+      {r.status === "DONE" && (
+        <p className="whitespace-pre-wrap rounded bg-accent/40 px-2.5 py-2 text-sm leading-relaxed">
+          {r.output}
+        </p>
+      )}
+      {r.status === "FAILED" && (
+        <p className="text-sm text-destructive">{r.error}</p>
+      )}
+    </div>
+  );
+}
+
+function ManualRunDialog({
   agent,
   onClose,
 }: {
@@ -379,6 +541,12 @@ function NewWorkflowDialog({
   );
 }
 
+const INTEGRATION_TOOLS: { tool: string; label: string; hint: string }[] = [
+  { tool: "publish_issue", label: "Issue tracker", hint: "file issues in the project repo" },
+  { tool: "notify_team", label: "Team chat", hint: "post to Slack / Discord" },
+  { tool: "email_owner", label: "Email", hint: "send you reports (never clients)" },
+];
+
 function NewAgentDialog({
   cwd,
   open,
@@ -392,57 +560,156 @@ function NewAgentDialog({
 }) {
   const [name, setName] = React.useState("");
   const [model, setModel] = React.useState("gemini/gemini-flash-latest");
+  const [mission, setMission] = React.useState("");
+  const [projectIds, setProjectIds] = React.useState<string[]>([]);
+  const [tools, setTools] = React.useState<string[]>([]);
+
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: backend.projects.list,
+    enabled: open,
+  });
 
   const create = useMutation({
     mutationFn: () =>
-      runtime.agents.create(cwd, { id: slug(name), name, model }),
+      runtime.agents.create(cwd, {
+        id: slug(name),
+        name,
+        model,
+        mission: mission.trim() || undefined,
+        projects: projectIds,
+        tools,
+      }),
     onSuccess: () => {
-      toast.success("Agent scaffolded (+ starter code)");
+      toast.success("Agent created — hit Run anytime, no setup needed");
       onDone();
       onOpenChange(false);
       setName("");
+      setMission("");
+      setProjectIds([]);
+      setTools([]);
     },
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Failed"),
   });
 
+  const toggle = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>New agent</DialogTitle>
           <DialogDescription>
-            Creates agents/&lt;id&gt;.yaml. Run it on any project from the list.
+            A mission + projects + granted integrations. Run executes the
+            mission with zero further input.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ag-name">Name</Label>
-            <Input
-              id="ag-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Summarizer"
-              autoFocus
-            />
+        <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ag-name">Name</Label>
+              <Input
+                id="ag-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Weekly reviewer"
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="ag-model">Model</Label>
+              <Input
+                id="ag-model"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="font-mono text-sm"
+              />
+            </div>
           </div>
+
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ag-model">Model</Label>
-            <Input
-              id="ag-model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="provider/model"
-              className="font-mono text-sm"
+            <Label htmlFor="ag-mission">Mission</Label>
+            <Textarea
+              id="ag-mission"
+              value={mission}
+              onChange={(e) => setMission(e.target.value)}
+              placeholder="Review recent activity, summarize progress, create todos for anything dropped, and notify the team."
+              className="min-h-20"
             />
+            <p className="text-xs text-muted-foreground">
+              The standing instruction every run executes.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Projects</Label>
+            {projects.data && projects.data.length > 0 ? (
+              <div className="flex flex-col gap-1">
+                {projects.data.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/40"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={projectIds.includes(p.id)}
+                      onChange={() => setProjectIds((l) => toggle(l, p.id))}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    <span className="text-sm">
+                      {p.client.name} — {p.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No projects yet — create one under Clients first.
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Integrations the agent may use</Label>
+            <div className="flex flex-col gap-1">
+              {INTEGRATION_TOOLS.map((integration) => (
+                <label
+                  key={integration.tool}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/40"
+                >
+                  <input
+                    type="checkbox"
+                    checked={tools.includes(integration.tool)}
+                    onChange={() => setTools((l) => toggle(l, integration.tool))}
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  <span className="text-sm">{integration.label}</span>
+                  <span className="ml-auto text-[11px] text-muted-foreground">
+                    {integration.hint}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Project data (knowledge, todos, decisions, timeline) is always
+              available. These grant real outside reach.
+            </p>
           </div>
         </div>
         <DialogFooter>
           <Button
             onClick={() => create.mutate()}
-            disabled={!slug(name) || !model || create.isPending}
+            disabled={
+              !slug(name) ||
+              !model ||
+              !mission.trim() ||
+              projectIds.length === 0 ||
+              create.isPending
+            }
           >
             {create.isPending && <Spinner className="size-4" />}
-            Create
+            Create agent
           </Button>
         </DialogFooter>
       </DialogContent>

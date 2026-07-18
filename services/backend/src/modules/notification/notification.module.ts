@@ -29,6 +29,6 @@ import { StubMailer } from './stub-mailer';
       },
     },
   ],
-  exports: [MAILER],
+  exports: [MAILER, ChatNotifier],
 })
 export class NotificationModule {}

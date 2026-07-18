@@ -7,6 +7,10 @@ export interface CreateAgentInput {
   description?: string;
   /** Provider-qualified model, e.g. "gemini/gemini-2.5-flash". */
   model: string;
+  /** Standing instruction — Run executes this with zero further input. */
+  mission?: string;
+  /** Backend project ids the agent operates on. */
+  projects?: string[];
   tools?: string[];
   workflow?: string;
   memory?: 'none' | 'buffer' | 'vector';
@@ -36,6 +40,8 @@ export class AgentRegistry {
       name: input.name,
       description: input.description,
       model: input.model,
+      mission: input.mission,
+      projects: input.projects ?? [],
       tools: input.tools ?? [],
       workflow: input.workflow,
       memory: { enabled: memoryKind !== 'none', kind: memoryKind },

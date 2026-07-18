@@ -196,13 +196,25 @@ export const runtime = {
   },
   agents: {
     list: (cwd: string) =>
-      rpc<{ id: string; name: string; model: string; workflow?: string }[]>(["agents", "list"], [cwd]),
+      rpc<
+        {
+          id: string;
+          name: string;
+          model: string;
+          mission?: string;
+          projects?: string[];
+          tools?: string[];
+          workflow?: string;
+        }[]
+      >(["agents", "list"], [cwd]),
     create: (
       cwd: string,
       input: {
         id: string;
         name: string;
         model: string;
+        mission?: string;
+        projects?: string[];
         tools?: string[];
         workflow?: string;
         memory?: "none" | "buffer" | "vector";

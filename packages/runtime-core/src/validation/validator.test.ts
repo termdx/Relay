@@ -95,6 +95,7 @@ describe('validateWorkspace', () => {
           version: '0.1.0',
           name: 'Rogue',
           model: 'mistral/large',
+          projects: [],
           tools: [],
           memory: { enabled: false, kind: 'none' },
           config: {},
