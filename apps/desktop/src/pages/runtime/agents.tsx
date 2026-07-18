@@ -219,7 +219,7 @@ function NewAgentDialog({
   onDone: () => void;
 }) {
   const [name, setName] = React.useState("");
-  const [model, setModel] = React.useState("gemini/gemini-2.5-flash");
+  const [model, setModel] = React.useState("gemini/gemini-flash-latest");
 
   const create = useMutation({
     mutationFn: () =>

@@ -51,7 +51,9 @@ export function aiProviderEnv(
       return {
         AI_PROVIDER: 'gemini',
         GEMINI_API_KEY: apiKey ?? '',
-        GEMINI_MODEL: provider.defaultModel ?? 'gemini-2.5-flash',
+        // The "-latest" alias tracks Google's current flash model — a pinned
+        // name here rotted once already (2.5-flash got gated for new keys).
+        GEMINI_MODEL: provider.defaultModel ?? 'gemini-flash-latest',
       };
     case 'ollama':
       return {

@@ -18,7 +18,7 @@ export function registerAgent(program: Command): void {
     .command('new <id>')
     .description('Scaffold a new agent definition')
     .option('--name <name>', 'display name')
-    .option('--model <model>', 'provider/model, e.g. gemini/gemini-2.5-flash')
+    .option('--model <model>', 'provider/model, e.g. gemini/gemini-flash-latest')
     .option('--tools <csv>', 'comma-separated tool names')
     .option('--workflow <workflow>', 'linked workflow')
     .option('--memory <kind>', 'none | buffer | vector')
@@ -35,7 +35,7 @@ export function registerAgent(program: Command): void {
             model = ensure(
               await p.text({
                 message: 'Model (provider/model)',
-                placeholder: 'gemini/gemini-2.5-flash',
+                placeholder: 'gemini/gemini-flash-latest',
               }),
             );
           }
@@ -44,7 +44,7 @@ export function registerAgent(program: Command): void {
         const manifest = await getClient().agents.create(process.cwd(), {
           id,
           name: name || id,
-          model: model || 'gemini/gemini-2.5-flash',
+          model: model || 'gemini/gemini-flash-latest',
           tools: options.tools ? options.tools.split(',').map((t) => t.trim()) : [],
           workflow: options.workflow,
           memory,

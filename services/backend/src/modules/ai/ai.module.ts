@@ -30,7 +30,7 @@ import { StubDraftGenerator } from './stub-draft-generator';
               'AI_PROVIDER=gemini but GEMINI_API_KEY is not set.',
             );
           }
-          const model = config.get<string>('GEMINI_MODEL', 'gemini-2.5-flash');
+          const model = config.get<string>('GEMINI_MODEL', 'gemini-flash-latest');
           logger.log(`DraftGenerator: Gemini (${model})`);
           return new GeminiDraftGenerator(apiKey, model);
         }

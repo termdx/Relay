@@ -252,7 +252,7 @@ function AddProviderDialog({
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder={provider === "gemini" ? "gemini-2.5-flash" : ""}
+              placeholder={provider === "gemini" ? "gemini-flash-latest" : ""}
             />
           </div>
           {needsKey && (
