@@ -75,10 +75,17 @@ export function defaultProvider(
   )[0];
 }
 
-/** Build the compose object deterministically from config + installed modules. */
+/**
+ * Build the compose object deterministically from config + installed modules.
+ * `injectedEnvKeys` (integration credentials resolved by the engine) are wired
+ * into every apiRoutes-capable service as `${KEY}` references — injected at
+ * generate time, NOT read from module manifests, so installed workspaces pick
+ * up new integrations without reinstalling modules.
+ */
 export function buildComposeFile(
   config: RelayConfig,
   modules: ModuleManifest[],
+  injectedEnvKeys: string[] = [],
 ): ComposeFile {
   const network = config.network.name;
   const services: Record<string, ComposeService> = {};
@@ -112,10 +119,15 @@ export function buildComposeFile(
 
   for (const module of [...modules].sort((a, b) => a.id.localeCompare(b.id))) {
     for (const service of module.services) {
+      const injected = module.capabilities.apiRoutes
+        ? Object.fromEntries(
+            injectedEnvKeys.map((key) => [key, `\${${key}:-}`]),
+          )
+        : {};
       services[service.name] = {
         image: service.image,
         command: service.command,
-        environment: service.env,
+        environment: { ...injected, ...service.env },
         ports: service.ports,
         volumes: service.volumes,
         depends_on: service.dependsOn,

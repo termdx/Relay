@@ -267,6 +267,9 @@ export class RuntimeEngine {
 
     // Installed integrations: resolve each credential secret into an env var
     // (github.token → GITHUB_TOKEN) so adapters select themselves by config.
+    // Track the keys — they're injected into the compose services directly,
+    // so already-installed module manifests need no reinstall to pick them up.
+    const integrationEnvKeys: string[] = [];
     for (const integration of await this.integrations.list()) {
       for (const field of integration.credentials) {
         const value = await this.secrets.get(field.secretRef);
@@ -275,11 +278,12 @@ export class RuntimeEngine {
             .toUpperCase()
             .replace(/[^A-Z0-9]/g, '_');
           env[key] = value;
+          integrationEnvKeys.push(key);
         }
       }
     }
 
-    const compose = buildComposeFile(this.config, modules);
+    const compose = buildComposeFile(this.config, modules, integrationEnvKeys);
     const composeYaml = serializeCompose(compose);
     const lock = {
       hash: composeHash(composeYaml, Object.keys(env)),

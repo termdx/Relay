@@ -6,8 +6,10 @@ import {
 } from './github-issue-publisher';
 
 /**
- * Logs what it would push and returns plausible issue URLs. No network calls.
- * Replace with an Octokit-backed adapter once the loop is validated.
+ * Logs what it would push. No network calls. The returned URLs use the
+ * reserved `.invalid` TLD (RFC 2606) on purpose: a simulated issue must
+ * never look like a real github.com link — clicking one should obviously
+ * fail, not land on somebody's unrelated issue #1.
  */
 @Injectable()
 export class StubGithubIssuePublisher implements GithubIssuePublisher {
@@ -26,7 +28,7 @@ export class StubGithubIssuePublisher implements GithubIssuePublisher {
       this.logger.log(`[stub] would create issue "${issue.title}" on ${repo}`);
       return {
         title: issue.title,
-        url: `https://github.com/${repo}/issues/${fakeNumber}`,
+        url: `https://simulated.github.invalid/${repo}/issues/${fakeNumber}`,
       };
     });
 

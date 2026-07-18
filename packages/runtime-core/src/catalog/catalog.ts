@@ -29,11 +29,9 @@ const MODULES = {
           AI_PROVIDER: '${AI_PROVIDER}',
           GEMINI_API_KEY: '${GEMINI_API_KEY}',
           GEMINI_MODEL: '${GEMINI_MODEL}',
-          // Integration credentials, resolved from the secret store at
-          // generate time; ':-' keeps compose quiet when not installed.
-          GITHUB_TOKEN: '${GITHUB_TOKEN:-}',
-          SMTP_URL: '${SMTP_URL:-}',
-          SMTP_FROM: '${SMTP_FROM:-}',
+          // Integration credentials (GITHUB_TOKEN, SMTP_URL, …) are NOT
+          // listed here — the engine injects them at generate time so
+          // installed workspaces pick up new integrations without reinstall.
         },
         dependsOn: ['postgres'],
         restart: 'unless-stopped',
