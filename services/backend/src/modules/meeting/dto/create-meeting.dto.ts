@@ -24,9 +24,10 @@ export class CreateMeetingDto {
   @IsEmail()
   clientEmail!: string;
 
-  /** "owner/repo" */
-  @Matches(/^[\w.-]+\/[\w.-]+$/, {
-    message: 'githubRepo must be in "owner/repo" form',
+  /** "owner/repo" (GitHub) or "gitlab:group/project" / "bitbucket:ws/repo". */
+  @Matches(/^(?:(?:github|gitlab|bitbucket):)?[\w.-]+(?:\/[\w.-]+)+$/, {
+    message:
+      'githubRepo must be "owner/repo", optionally prefixed "gitlab:" or "bitbucket:"',
   })
   githubRepo!: string;
 }

@@ -283,15 +283,17 @@ export class RuntimeEngine {
         }
       }
     }
-    // GitHub connected → the backend can receive webhooks. The secret is
-    // generated here (not user-supplied), so it lives outside the manifest's
-    // credential list.
-    if (installedIntegrations.some((i) => i.id === 'github')) {
-      env.GITHUB_WEBHOOK_SECRET = await this.ensureSecret(
-        'github.webhookSecret',
-        () => randomBytes(24).toString('base64url'),
-      );
-      integrationEnvKeys.push('GITHUB_WEBHOOK_SECRET');
+    // Tracker connected → the backend can receive its webhooks. Secrets are
+    // generated here (not user-supplied), so they live outside the manifests'
+    // credential lists.
+    for (const provider of ['github', 'gitlab', 'bitbucket'] as const) {
+      if (installedIntegrations.some((i) => i.id === provider)) {
+        const key = `${provider.toUpperCase()}_WEBHOOK_SECRET`;
+        env[key] = await this.ensureSecret(`${provider}.webhookSecret`, () =>
+          randomBytes(24).toString('base64url'),
+        );
+        integrationEnvKeys.push(key);
+      }
     }
 
     const compose = buildComposeFile(this.config, modules, integrationEnvKeys);

@@ -1,15 +1,38 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
 import { DomainEventBus } from '../../events/domain-event-bus';
-import { NOTIFICATION_SENT } from '../../events/domain-event';
+import {
+  DOMAIN_EVENT,
+  NOTIFICATION_SENT,
+  type DomainEvent,
+} from '../../events/domain-event';
+import { renderEvent } from '../knowledge/event-renderer';
 import { OutboxService } from '../outbox/outbox.service';
 import {
   PORTAL_LOGIN_EMAIL,
   type PortalLoginEmailPayload,
 } from '../portal/portal-auth.service';
+import { ChatNotifier } from './chat-notifier';
 import { MAILER, type Mailer } from './mailer';
 
 /** Outbox message type: a client should receive an approval request email. */
 export const APPROVAL_EMAIL_REQUESTED = 'notification.approval_email';
+
+/** Outbox message type: fan a line out to the configured chat sinks. */
+export const CHAT_MESSAGE = 'notification.chat';
+
+/** Which events are worth a chat ping — signal, not a firehose mirror. */
+const CHAT_NOTIFY_TYPES = new Set([
+  'meeting.sent_for_approval',
+  'meeting.approved',
+  'meeting.changes_requested',
+  'decision.recorded',
+  'todo.completed',
+  'github.pr_merged',
+  'gitlab.mr_merged',
+  'bitbucket.pr_merged',
+]);
 
 export interface ApprovalEmailPayload {
   meetingId: string;
@@ -27,15 +50,36 @@ export interface ApprovalEmailPayload {
 @Injectable()
 export class NotificationService implements OnModuleInit {
   constructor(
+    @Inject(DRIZZLE) private readonly db: RelayDb,
     @Inject(MAILER) private readonly mailer: Mailer,
+    private readonly chat: ChatNotifier,
     private readonly outbox: OutboxService,
     private readonly events: DomainEventBus,
   ) {}
+
+  /**
+   * Chat fan-out: noteworthy project events become a Slack/Discord line.
+   * The enqueue is the durability boundary — once a message is on the
+   * outbox, delivery retries like any external write.
+   */
+  @OnEvent(DOMAIN_EVENT)
+  async onDomainEvent(event: DomainEvent): Promise<void> {
+    if (!event.projectId) return;
+    if (!CHAT_NOTIFY_TYPES.has(event.type)) return;
+    if (!this.chat.hasSinks()) return;
+    const text = renderEvent(event);
+    if (!text) return;
+    await this.outbox.enqueue(this.db, CHAT_MESSAGE, { text });
+  }
 
   onModuleInit(): void {
     this.outbox.register(APPROVAL_EMAIL_REQUESTED, async (payload) => {
       const email = payload as unknown as ApprovalEmailPayload;
       await this.sendApprovalEmail(email);
+    });
+    this.outbox.register(CHAT_MESSAGE, async (payload) => {
+      const { text } = payload as { text: string };
+      await this.chat.send(text);
     });
     this.outbox.register(PORTAL_LOGIN_EMAIL, async (payload) => {
       const login = payload as unknown as PortalLoginEmailPayload;

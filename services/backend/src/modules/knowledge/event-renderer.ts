@@ -59,18 +59,28 @@ export function renderEvent(event: RenderableEvent): string | null {
     case 'notification.sent':
       return line(`Client emailed: "${str(p.subject)}".`);
     case 'github.push':
+    case 'gitlab.push':
+    case 'bitbucket.push':
       return line(
         `${str(p.author) ?? 'Someone'} pushed ${num(p.commitCount) ?? 'some'} commit(s) to ${str(p.branch) ?? 'a branch'}: "${str(p.headMessage) ?? ''}".`,
       );
     case 'github.pr_opened':
+    case 'gitlab.mr_opened':
+    case 'bitbucket.pr_opened':
       return line(`${str(p.author) ?? 'Someone'} opened PR #${num(p.number)}: "${str(p.title)}".`);
     case 'github.pr_merged':
+    case 'gitlab.mr_merged':
+    case 'bitbucket.pr_merged':
       return line(`PR #${num(p.number)} merged: "${str(p.title)}".`);
     case 'github.pr_closed':
+    case 'gitlab.mr_closed':
+    case 'bitbucket.pr_declined':
       return line(`PR #${num(p.number)} closed without merging: "${str(p.title)}".`);
     case 'github.issue_opened':
+    case 'gitlab.issue_opened':
       return line(`Issue #${num(p.number)} opened: "${str(p.title)}".`);
     case 'github.issue_closed':
+    case 'gitlab.issue_closed':
       return line(`Issue #${num(p.number)} closed: "${str(p.title)}".`);
     default:
       return null;

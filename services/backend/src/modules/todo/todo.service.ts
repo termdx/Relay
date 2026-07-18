@@ -11,6 +11,7 @@ import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
 import { DomainEventBus } from '../../events/domain-event-bus';
 import {
   GITHUB_ISSUE_CLOSED,
+  GITLAB_ISSUE_CLOSED,
   MEETING_APPROVED,
   TODO_COMPLETED,
   TODO_CREATED,
@@ -84,10 +85,11 @@ export class TodoService implements OnModuleInit {
   }
 
   /**
-   * Close the loop: an issue closed on GitHub completes the todo that mirrors
-   * it. Matched by externalUrl; already-done todos are left untouched.
+   * Close the loop: an issue closed on GitHub or GitLab completes the todo
+   * that mirrors it. Matched by externalUrl; done todos are left untouched.
    */
   @OnEvent(GITHUB_ISSUE_CLOSED)
+  @OnEvent(GITLAB_ISSUE_CLOSED)
   async onGithubIssueClosed(event: DomainEvent): Promise<void> {
     const url = event.payload.url;
     if (typeof url !== 'string') return;

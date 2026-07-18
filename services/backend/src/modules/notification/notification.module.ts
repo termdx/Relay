@@ -1,5 +1,6 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ChatNotifier } from './chat-notifier';
 import { MAILER } from './mailer';
 import { NotificationService } from './notification.service';
 import { SmtpMailer } from './smtp-mailer';
@@ -14,6 +15,7 @@ import { StubMailer } from './stub-mailer';
   providers: [
     SmtpMailer,
     StubMailer,
+    ChatNotifier,
     NotificationService,
     {
       provide: MAILER,

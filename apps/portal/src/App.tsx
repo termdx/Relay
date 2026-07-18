@@ -470,6 +470,14 @@ const FEED_LABELS: Record<string, string> = {
   "github.pr_merged": "Change shipped",
   "github.issue_opened": "Task opened",
   "github.issue_closed": "Task closed",
+  "gitlab.push": "Code pushed",
+  "gitlab.mr_opened": "Change proposed",
+  "gitlab.mr_merged": "Change shipped",
+  "gitlab.issue_opened": "Task opened",
+  "gitlab.issue_closed": "Task closed",
+  "bitbucket.push": "Code pushed",
+  "bitbucket.pr_opened": "Change proposed",
+  "bitbucket.pr_merged": "Change shipped",
 };
 
 function FeedRow({ event }: { event: FeedEvent }) {

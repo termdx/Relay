@@ -89,11 +89,50 @@ const INTEGRATIONS = {
       { name: 'api', type: 'http', target: 'https://api.github.com' },
     ],
   },
+  gitlab: {
+    id: 'gitlab',
+    version: '0.1.0',
+    displayName: 'GitLab',
+    description:
+      'Issues out + webhooks in. Repo form: "gitlab:group/project". Token: a project/group access token with api scope.',
+    credentials: [
+      { name: 'token', secretRef: 'gitlab.token', required: true },
+      { name: 'base_url', secretRef: 'gitlab.baseUrl', required: false },
+    ],
+    healthChecks: [
+      { name: 'api', type: 'http', target: 'https://gitlab.com/api/v4/version' },
+    ],
+  },
+  bitbucket: {
+    id: 'bitbucket',
+    version: '0.1.0',
+    displayName: 'Bitbucket',
+    description:
+      'Issues out + webhooks in. Repo form: "bitbucket:workspace/repo". Token: a repository access token.',
+    credentials: [{ name: 'token', secretRef: 'bitbucket.token', required: true }],
+    healthChecks: [
+      { name: 'api', type: 'http', target: 'https://api.bitbucket.org/2.0/repositories' },
+    ],
+  },
   slack: {
     id: 'slack',
     version: '0.1.0',
     displayName: 'Slack',
-    credentials: [{ name: 'token', secretRef: 'slack.token', required: true }],
+    description:
+      'Notifications for approvals, decisions, merges. Paste an incoming-webhook URL.',
+    credentials: [
+      { name: 'webhook_url', secretRef: 'slack.webhookUrl', required: true },
+    ],
+  },
+  discord: {
+    id: 'discord',
+    version: '0.1.0',
+    displayName: 'Discord',
+    description:
+      'Notifications for approvals, decisions, merges. Paste a channel webhook URL.',
+    credentials: [
+      { name: 'webhook_url', secretRef: 'discord.webhookUrl', required: true },
+    ],
   },
   smtp: {
     id: 'smtp',

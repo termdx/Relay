@@ -44,6 +44,16 @@ const EVENT_LABELS: Record<string, string> = {
   "github.pr_closed": "PR closed",
   "github.issue_opened": "Issue opened",
   "github.issue_closed": "Issue closed",
+  "gitlab.push": "Commits pushed",
+  "gitlab.mr_opened": "MR opened",
+  "gitlab.mr_merged": "MR merged",
+  "gitlab.mr_closed": "MR closed",
+  "gitlab.issue_opened": "Issue opened",
+  "gitlab.issue_closed": "Issue closed",
+  "bitbucket.push": "Commits pushed",
+  "bitbucket.pr_opened": "PR opened",
+  "bitbucket.pr_merged": "PR merged",
+  "bitbucket.pr_declined": "PR declined",
 };
 
 function actorIcon(actor: TimelineActor) {

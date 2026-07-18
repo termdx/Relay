@@ -29,6 +29,14 @@ const CLIENT_SAFE_EVENTS = [
   'github.pr_merged',
   'github.issue_opened',
   'github.issue_closed',
+  'gitlab.push',
+  'gitlab.mr_opened',
+  'gitlab.mr_merged',
+  'gitlab.issue_opened',
+  'gitlab.issue_closed',
+  'bitbucket.push',
+  'bitbucket.pr_opened',
+  'bitbucket.pr_merged',
 ];
 
 export interface PortalOverview {

@@ -25,10 +25,10 @@ encrypted secret store; manifests and code never contain values.
 | Integration | Direction | Purpose | Status |
 |---|---|---|---|
 | GitHub | both | issues out; commits/PRs/issues in (webhooks) | shipped both directions — issue close auto-completes the mirrored todo |
-| GitLab | both | same as GitHub | planned |
-| Bitbucket | both | same as GitHub | planned |
-| Slack | both | notifications out; messages/decisions in | catalog entry only |
-| Discord | both | same as Slack | planned |
+| GitLab | both | issues out ("gitlab:group/proj"); push/MR/issue webhooks in; issue close completes todos | shipped |
+| Bitbucket | both | issues out ("bitbucket:ws/repo"); push/PR webhooks in | shipped |
+| Slack | out | incoming-webhook notifications (approvals, decisions, merges) via outbox | shipped (messages-in later) |
+| Discord | out | same as Slack | shipped |
 | Google Calendar | both | milestones out; meetings in | planned |
 | SMTP | out | approval links, weekly digests, portal invites | adapter shipped (nodemailer, SMTP_URL-selected) |
 | Amazon S3 | out | images, attachments, recordings | planned |

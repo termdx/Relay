@@ -8,7 +8,9 @@ import {
 } from 'class-validator';
 import type { ProjectStatus } from '../project.schema';
 
-const GITHUB_REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
+/** "owner/repo" (GitHub) or "gitlab:group/project" / "bitbucket:ws/repo". */
+const GITHUB_REPO_PATTERN =
+  /^(?:(?:github|gitlab|bitbucket):)?[\w.-]+(?:\/[\w.-]+)+$/;
 
 export class CreateProjectDto {
   @IsUUID()
