@@ -1,5 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Pencil, Play, Plus, Trash2, Workflow, Wrench } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  ChevronDown,
+  Pencil,
+  Play,
+  Plus,
+  Trash2,
+  Workflow,
+  Wrench,
+  X,
+  XCircle,
+} from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -38,14 +50,52 @@ export function RuntimeAgentsPage() {
   const [newWorkflow, setNewWorkflow] = React.useState(false);
   const [newAgent, setNewAgent] = React.useState(false);
   const [editing, setEditing] = React.useState<AgentListItem | null>(null);
-  const [running, setRunning] = React.useState<{
-    id: string;
-    name: string;
-    model: string;
-    mission?: string;
-    projects?: string[];
-    tools?: string[];
-  } | null>(null);
+  const [running, setRunning] = React.useState<AgentListItem | null>(null);
+  const [watching, setWatching] = React.useState<
+    { agent: AgentListItem; runs: { projectId: string; runId: string }[] }[]
+  >([]);
+
+  const projectsQuery = useQuery({
+    queryKey: ["projects"],
+    queryFn: backend.projects.list,
+  });
+
+  /** Mission agents run with zero friction: fire, then watch via toast. */
+  async function startMissionRuns(agent: AgentListItem) {
+    const bound = (agent.projects ?? []).filter((id) =>
+      (projectsQuery.data ?? []).some((p) => p.id === id),
+    );
+    if (bound.length === 0) {
+      toast.error("None of this agent's projects exist anymore — edit it.");
+      return;
+    }
+    toast.loading(`${agent.name} is working…`, {
+      id: `agent-${agent.id}`,
+      position: "top-center",
+    });
+    try {
+      const runs = await Promise.all(
+        bound.map((projectId) =>
+          backend.agentRuns
+            .create({
+              agentId: agent.id,
+              agentName: agent.name,
+              model: agent.model,
+              tools: agent.tools,
+              projectId,
+              instruction: agent.mission!,
+            })
+            .then((run) => ({ projectId, runId: run.id })),
+        ),
+      );
+      setWatching((w) => [...w.filter((x) => x.agent.id !== agent.id), { agent, runs }]);
+    } catch (e) {
+      toast.error(
+        e instanceof ApiError ? e.message : "Could not start the agent",
+        { id: `agent-${agent.id}`, position: "top-center" },
+      );
+    }
+  }
 
   const workflows = useQuery({
     queryKey: ["workflows", cwd],
@@ -121,7 +171,11 @@ export function RuntimeAgentsPage() {
                 title={a.id}
                 meta={`${a.model}${a.workflow ? ` · ${a.workflow}` : ""}`}
                 onRemove={() => removeAgent.mutate(a.id)}
-                onRun={() => setRunning(a)}
+                onRun={() =>
+                  a.mission && (a.projects?.length ?? 0) > 0
+                    ? void startMissionRuns(a)
+                    : setRunning(a)
+                }
                 onEdit={() => setEditing(a)}
               />
             ))}
@@ -153,8 +207,22 @@ export function RuntimeAgentsPage() {
         />
       )}
       {running && (
-        <RunAgentDialog agent={running} onClose={() => setRunning(null)} />
+        <ManualRunDialog agent={running} onClose={() => setRunning(null)} />
       )}
+      {watching.map((w) => (
+        <AgentRunWatcher
+          key={w.agent.id}
+          agent={w.agent}
+          runs={w.runs}
+          projectName={(id) => {
+            const p = projectsQuery.data?.find((x) => x.id === id);
+            return p ? `${p.client.name} — ${p.name}` : id;
+          }}
+          onSettled={() =>
+            setWatching((list) => list.filter((x) => x.agent.id !== w.agent.id))
+          }
+        />
+      ))}
     </div>
   );
 }
@@ -211,164 +279,163 @@ function Row({
   );
 }
 
-/** Frictionless run: an agent with a mission + projects starts immediately —
- * one run per bound project, watched live. Legacy agents without a mission
- * fall back to the manual form below. */
-function RunAgentDialog({
+/**
+ * Headless watcher: polls the agent's runs, keeps the top-center loading
+ * toast fresh, and when everything settles swaps it for the expandable
+ * "did its work" toast. Renders nothing.
+ */
+function AgentRunWatcher({
   agent,
-  onClose,
+  runs,
+  projectName,
+  onSettled,
 }: {
-  agent: {
-    id: string;
-    name: string;
-    model: string;
-    mission?: string;
-    projects?: string[];
-    tools?: string[];
-  };
-  onClose: () => void;
+  agent: AgentListItem;
+  runs: { projectId: string; runId: string }[];
+  projectName: (id: string) => string;
+  onSettled: () => void;
 }) {
-  if (agent.mission && (agent.projects?.length ?? 0) > 0) {
-    return <MissionRunDialog agent={agent} onClose={onClose} />;
-  }
-  return <ManualRunDialog agent={agent} onClose={onClose} />;
+  const announced = React.useRef(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const toastId = `agent-${agent.id}`;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const results = await Promise.all(
+          runs.map((r) => backend.agentRuns.get(r.runId)),
+        );
+        if (cancelled) return;
+        const settled = results.every(
+          (r) => r.status === "DONE" || r.status === "FAILED",
+        );
+        if (!settled) {
+          const doneCount = results.filter((r) => r.status === "DONE").length;
+          const toolCalls = results.reduce((n, r) => n + r.trace.length, 0);
+          toast.loading(
+            `${agent.name} is working… ${doneCount}/${runs.length} projects` +
+              (toolCalls > 0 ? ` · ${toolCalls} tool call(s)` : ""),
+            { id: toastId, position: "top-center" },
+          );
+          setTimeout(() => void tick(), 1500);
+          return;
+        }
+        if (!announced.current) {
+          announced.current = true;
+          toast.dismiss(toastId);
+          toast.custom(
+            (t) => (
+              <AgentDoneToast
+                agent={agent}
+                results={runs.map((r, i) => ({
+                  projectId: r.projectId,
+                  run: results[i]!,
+                }))}
+                projectName={projectName}
+                onDismiss={() => toast.dismiss(t)}
+              />
+            ),
+            { position: "top-center", duration: Infinity },
+          );
+          onSettled();
+        }
+      } catch {
+        if (!cancelled) setTimeout(() => void tick(), 3000);
+      }
+    };
+    void tick();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
 }
 
-function MissionRunDialog({
+/** The completion toast: one line + chevron; expands into the full report. */
+function AgentDoneToast({
   agent,
-  onClose,
+  results,
+  projectName,
+  onDismiss,
 }: {
-  agent: {
-    id: string;
-    name: string;
-    model: string;
-    mission?: string;
-    projects?: string[];
-    tools?: string[];
-  };
-  onClose: () => void;
+  agent: AgentListItem;
+  results: { projectId: string; run: AgentRun }[];
+  projectName: (id: string) => string;
+  onDismiss: () => void;
 }) {
-  const [runIds, setRunIds] = React.useState<Record<string, string>>({});
-  const [failed, setFailed] = React.useState<Record<string, string>>({});
-  const started = React.useRef(false);
-
-  const projects = useQuery({
-    queryKey: ["projects"],
-    queryFn: backend.projects.list,
-  });
-  const bound = (agent.projects ?? []).filter((id) =>
-    (projects.data ?? []).some((p) => p.id === id),
-  );
-
-  // Fire immediately — the mission IS the input.
-  React.useEffect(() => {
-    if (started.current || !projects.data) return;
-    started.current = true;
-    for (const projectId of bound) {
-      backend.agentRuns
-        .create({
-          agentId: agent.id,
-          agentName: agent.name,
-          model: agent.model,
-          tools: agent.tools,
-          projectId,
-          instruction: agent.mission!,
-        })
-        .then((run) => setRunIds((m) => ({ ...m, [projectId]: run.id })))
-        .catch((e: unknown) =>
-          setFailed((m) => ({
-            ...m,
-            [projectId]: e instanceof ApiError ? e.message : "Could not start",
-          })),
-        );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projects.data]);
-
-  const projectName = (id: string) => {
-    const p = projects.data?.find((x) => x.id === id);
-    return p ? `${p.client.name} — ${p.name}` : id;
-  };
+  const [expanded, setExpanded] = React.useState(false);
+  const failures = results.filter((r) => r.run.status === "FAILED").length;
+  const toolCalls = results.reduce((n, r) => n + r.run.trace.length, 0);
+  const ok = failures === 0;
 
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{agent.name} is working</DialogTitle>
-          <DialogDescription className="line-clamp-2">
-            {agent.mission}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
-          {bound.map((projectId) => (
-            <div key={projectId} className="rounded-md border border-border p-3">
-              <div className="mb-1.5 text-sm font-medium">{projectName(projectId)}</div>
-              {failed[projectId] ? (
-                <p className="text-sm text-destructive">{failed[projectId]}</p>
-              ) : runIds[projectId] ? (
-                <RunProgress runId={runIds[projectId]!} />
+    <div className="w-[420px] max-w-[90vw] rounded-lg border border-border bg-card p-3.5 shadow-lg">
+      <div className="flex items-center gap-2.5">
+        {ok ? (
+          <CheckCircle2 className="size-4.5 shrink-0 text-success" />
+        ) : (
+          <XCircle className="size-4.5 shrink-0 text-destructive" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">
+            {ok
+              ? `${agent.name} did its work`
+              : `${agent.name} finished with ${failures} failure(s)`}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {results.length} project(s) · {toolCalls} tool call(s)
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-label={expanded ? "Collapse report" : "Expand report"}
+          className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <ChevronDown
+            className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-3 flex max-h-72 flex-col gap-2.5 overflow-y-auto border-t border-border pt-3">
+          {results.map(({ projectId, run }) => (
+            <div key={projectId}>
+              <div className="mb-1 flex items-center gap-2">
+                <span className="text-xs font-medium">{projectName(projectId)}</span>
+                {run.trace.map((t, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 rounded border border-border px-1 py-px font-mono text-[9px] text-muted-foreground"
+                  >
+                    <Wrench className="size-2.5" />
+                    {t.tool}
+                  </span>
+                ))}
+              </div>
+              {run.status === "DONE" ? (
+                <p className="whitespace-pre-wrap rounded bg-accent/40 px-2.5 py-2 text-xs leading-relaxed">
+                  {run.output}
+                </p>
               ) : (
-                <Spinner className="size-4" />
+                <p className="text-xs text-destructive">{run.error}</p>
               )}
             </div>
           ))}
-          {bound.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              None of this agent's projects exist anymore — edit its manifest.
-            </p>
-          )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** Live status + trace + output for one run. */
-function RunProgress({ runId }: { runId: string }) {
-  const run = useQuery({
-    queryKey: ["agent-run", runId],
-    queryFn: () => backend.agentRuns.get(runId),
-    refetchInterval: (q) => {
-      const status = (q.state.data as AgentRun | undefined)?.status;
-      return status === "DONE" || status === "FAILED" ? false : 1500;
-    },
-  });
-  const r = run.data;
-  if (!r) return <Spinner className="size-4" />;
-  return (
-    <div className="flex flex-col gap-2">
-      {(r.status === "QUEUED" || r.status === "RUNNING") && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Spinner className="size-3.5" />
-          {r.status === "RUNNING" ? "Working…" : "Queued…"}
-          {r.trace.length > 0 && ` · ${r.trace.length} tool call(s)`}
-        </div>
-      )}
-      {r.trace.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {r.trace.map((t, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-            >
-              <Wrench className="size-2.5" />
-              {t.tool}
-            </span>
-          ))}
-        </div>
-      )}
-      {r.status === "DONE" && (
-        <p className="whitespace-pre-wrap rounded bg-accent/40 px-2.5 py-2 text-sm leading-relaxed">
-          {r.output}
-        </p>
-      )}
-      {r.status === "FAILED" && (
-        <p className="text-sm text-destructive">{r.error}</p>
       )}
     </div>
   );
