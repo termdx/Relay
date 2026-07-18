@@ -24,10 +24,11 @@ export class UpdateBrandingDto {
   @MaxLength(60)
   agencyName?: string;
 
-  /** data:image/… (small) or https URL; empty string clears. */
+  /** data:image/… or https URL; empty string clears. Cap fits a 1 MB image
+   * after base64 inflation (~4/3). */
   @IsOptional()
   @IsString()
-  @MaxLength(200_000)
+  @MaxLength(1_400_000)
   logo?: string;
 
   @IsOptional()

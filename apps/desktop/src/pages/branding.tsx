@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
 
-const MAX_LOGO_BYTES = 150_000;
+const MAX_LOGO_BYTES = 1_000_000;
 const DEFAULT_ACCENT = "#7c5cff";
 
 /** What the client portal wears: agency name, logo, accent color. */
@@ -50,7 +50,7 @@ export function BrandingPage() {
   function onLogoFile(file: File | undefined) {
     if (!file) return;
     if (file.size > MAX_LOGO_BYTES) {
-      toast.error("Logo too large — keep it under 150 KB (SVG or small PNG).");
+      toast.error("Logo too large — keep it under 1 MB.");
       return;
     }
     const reader = new FileReader();
@@ -152,7 +152,7 @@ export function BrandingPage() {
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                SVG or small PNG, under 150 KB. Stored inline — no external hosting.
+                SVG, PNG, JPEG, or WebP, under 1 MB. Stored inline — no external hosting.
               </p>
             </div>
 

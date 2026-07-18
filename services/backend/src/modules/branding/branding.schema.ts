@@ -7,7 +7,7 @@ import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 export const branding = pgTable('branding', {
   id: uuid('id').primaryKey().defaultRandom(),
   agencyName: text('agency_name'),
-  /** data:image/… URI (≤200KB) or an https URL. */
+  /** data:image/… URI (≤1MB image) or an https URL. */
   logo: text('logo'),
   /** #rrggbb accent applied to the portal theme. */
   accentColor: text('accent_color'),

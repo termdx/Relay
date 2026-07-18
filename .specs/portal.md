@@ -57,7 +57,7 @@ Shipped (v1) — `apps/portal`, a Vite/React SPA on the Relay design system:
   never by UI hiding; the portal renders from the same resolved flags.
   Approvals are not togglable — they're the core loop.
 
-- **Branding**: agency name, logo (inline data URI or https URL, ≤150 KB —
+- **Branding**: agency name, logo (inline data URI or https URL, ≤1 MB —
   no object storage needed), and accent color, edited on the desktop
   Branding page and served publicly at `GET /portal/branding` (the login
   page needs it pre-auth). The portal themes its primary color from the
