@@ -76,13 +76,13 @@ export class AgentToolsService {
             columns: { githubRepo: true },
           });
           if (!project?.githubRepo) {
-            return 'This project has no repository configured.';
+            return 'ERROR: this project has no repository configured.';
           }
           if (/^(gitlab|bitbucket):/.test(project.githubRepo)) {
             return 'Issue listing is only supported for GitHub repositories so far.';
           }
           const token = config.get<string>('GITHUB_TOKEN');
-          if (!token) return 'GitHub is not connected (no token).';
+          if (!token) return 'ERROR: GitHub is not connected (no token).';
           const state = ['open', 'closed', 'all'].includes(str(args.state))
             ? str(args.state)
             : 'all';
@@ -124,13 +124,13 @@ export class AgentToolsService {
             columns: { githubRepo: true },
           });
           if (!project?.githubRepo) {
-            return 'This project has no repository configured.';
+            return 'ERROR: this project has no repository configured.';
           }
           if (/^(gitlab|bitbucket):/.test(project.githubRepo)) {
             return 'CI status is only supported for GitHub repositories so far.';
           }
           const token = config.get<string>('GITHUB_TOKEN');
-          if (!token) return 'GitHub is not connected (no token).';
+          if (!token) return 'ERROR: GitHub is not connected (no token).';
           const res = await fetch(
             `https://api.github.com/repos/${project.githubRepo}/actions/runs?per_page=8`,
             {
@@ -187,7 +187,7 @@ export class AgentToolsService {
             columns: { githubRepo: true },
           });
           if (!project?.githubRepo) {
-            return 'This project has no repository configured.';
+            return 'ERROR: this project has no repository configured.';
           }
           const [issue] = await issues.publishIssues(project.githubRepo, [
             {
@@ -208,7 +208,7 @@ export class AgentToolsService {
           required: ['message'],
         },
         execute: async (ctx, args) => {
-          if (!chat.hasSinks()) return 'No team chat is connected.';
+          if (!chat.hasSinks()) return 'ERROR: No team chat is connected — the message was NOT posted.';
           await chat.send(`🤖 ${str(args.message)} — agent ${ctx.agentId}`);
           return 'Posted to team chat.';
         },
@@ -231,7 +231,7 @@ export class AgentToolsService {
             .from(users)
             .where(eq(users.role, 'owner'))
             .limit(1);
-          if (!owner) return 'No workspace owner found.';
+          if (!owner) return 'ERROR: no workspace owner found — the email was NOT sent.';
           await mailer.send({
             to: owner.email,
             subject: `[${ctx.agentId}] ${str(args.subject)}`,

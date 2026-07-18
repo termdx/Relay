@@ -48,11 +48,29 @@ export function RuntimeIntegrationsPage() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["integrations", cwd] });
 
+  /** Credentials only reach the backend when the stack regenerates — apply
+   * immediately so "connected" always means "working". */
+  async function applyToStack() {
+    toast.loading("Applying to the stack…", { id: "stack-apply" });
+    try {
+      await runtime.stack.up(cwd);
+      toast.success("Stack updated — the integration is live", { id: "stack-apply" });
+    } catch (e) {
+      toast.error(
+        e instanceof RuntimeError
+          ? `Connected, but applying failed: ${e.message}`
+          : "Connected, but applying failed — run `relay up` manually",
+        { id: "stack-apply" },
+      );
+    }
+  }
+
   const remove = useMutation({
     mutationFn: (id: string) => runtime.integrations.remove(cwd, id),
     onSuccess: (_r, id) => {
       toast.success(`Removed "${id}"`);
       invalidate();
+      void applyToStack();
     },
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Remove failed"),
   });
@@ -155,6 +173,7 @@ export function RuntimeIntegrationsPage() {
           onConnected={() => {
             invalidate();
             setAdding(null);
+            void applyToStack();
           }}
         />
       )}
