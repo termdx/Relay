@@ -615,6 +615,11 @@ function AgentDialog({
         "gemini/gemini-3.5-flash",
         "gemini/gemini-flash-lite-latest",
       ];
+      // Agents need function calling: keep Gemini text models, drop Gemma
+      // (no tool support on the API), image/TTS/embedding/specialty models.
+      const toolCapable = (name: string) =>
+        /\/gemini-/.test(name) &&
+        !/(image|tts|embed|audio|live|computer-use|research|preview-tts)/.test(name);
       try {
         const providers = await runtime.ai.list(cwd);
         const lists = await Promise.all(
@@ -625,7 +630,7 @@ function AgentDialog({
               .catch(() => [] as string[]),
           ),
         );
-        const found = lists.flat();
+        const found = lists.flat().filter(toolCapable);
         return found.length > 0 ? found : fallback;
       } catch {
         return fallback;

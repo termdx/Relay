@@ -23,7 +23,7 @@ import {
 export const AGENT_RUN = 'agent.run';
 export const WORKFLOW_RUN = 'workflow.run';
 
-const MAX_TURNS = 6;
+const DEFAULT_MAX_TURNS = 12;
 
 /**
  * Executes agent runs: a native function-calling loop (Gemini) over the
@@ -206,7 +206,10 @@ export class AgentExecutorService implements OnModuleInit {
       },
     ];
 
-    for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const maxTurns = Number(
+      this.config.get('AGENT_MAX_TURNS', String(DEFAULT_MAX_TURNS)),
+    );
+    for (let turn = 0; turn < maxTurns; turn++) {
       const response = await this.generateWithQuotaRetry(() =>
         client.models.generateContent({
           model,
@@ -246,8 +249,27 @@ export class AgentExecutorService implements OnModuleInit {
       contents.push({ role: 'user', parts: responseParts });
     }
 
+    // Turn budget exhausted: force a final answer with tools disabled so the
+    // run still ends in a useful report instead of a dead stop.
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: 'Stop using tools now. Summarize concisely what you found, what you did, and anything you could not finish.',
+        },
+      ],
+    });
+    const final = await this.generateWithQuotaRetry(() =>
+      client.models.generateContent({
+        model,
+        contents,
+        config: { temperature: 0.2 },
+      }),
+    );
     return {
-      output: `(stopped after ${MAX_TURNS} tool turns — partial work is in the trace)`,
+      output:
+        final.text?.trim() ||
+        `(stopped after ${maxTurns} tool turns — partial work is in the trace)`,
       trace,
     };
   }
