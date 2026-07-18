@@ -8,9 +8,11 @@ ingests them.
 
 - **Internal** — module actions: `ClientCreated`, `MeetingDrafted`,
   `ApprovalDecided`, `TodoCompleted`, `DecisionRecorded`.
-- **External** — integration webhooks normalized by adapters: `PROpened`,
-  `PRMerged`, `IssueClosed`, `MessagePosted`, `CalendarEventScheduled`,
-  `DeploymentCompleted`.
+- **External** — integration webhooks normalized by adapters (github.push,
+  github.pr_opened/merged/closed, github.issue_opened/closed shipped;
+  Slack/Discord messages and calendar events follow the same receiver
+  pattern). Signature-verified against the raw body, attributed to the
+  project whose repo matches, dropped otherwise.
 
 ## Shape
 

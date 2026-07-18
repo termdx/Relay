@@ -270,7 +270,8 @@ export class RuntimeEngine {
     // Track the keys — they're injected into the compose services directly,
     // so already-installed module manifests need no reinstall to pick them up.
     const integrationEnvKeys: string[] = [];
-    for (const integration of await this.integrations.list()) {
+    const installedIntegrations = await this.integrations.list();
+    for (const integration of installedIntegrations) {
       for (const field of integration.credentials) {
         const value = await this.secrets.get(field.secretRef);
         if (value) {
@@ -281,6 +282,16 @@ export class RuntimeEngine {
           integrationEnvKeys.push(key);
         }
       }
+    }
+    // GitHub connected → the backend can receive webhooks. The secret is
+    // generated here (not user-supplied), so it lives outside the manifest's
+    // credential list.
+    if (installedIntegrations.some((i) => i.id === 'github')) {
+      env.GITHUB_WEBHOOK_SECRET = await this.ensureSecret(
+        'github.webhookSecret',
+        () => randomBytes(24).toString('base64url'),
+      );
+      integrationEnvKeys.push('GITHUB_WEBHOOK_SECRET');
     }
 
     const compose = buildComposeFile(this.config, modules, integrationEnvKeys);

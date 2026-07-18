@@ -5,14 +5,17 @@ import {
   NotFoundException,
   type OnModuleInit,
 } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { OnEvent } from '@nestjs/event-emitter';
+import { and, asc, eq } from 'drizzle-orm';
 import { DRIZZLE, type RelayDb } from '../../database/drizzle.provider';
 import { DomainEventBus } from '../../events/domain-event-bus';
 import {
+  GITHUB_ISSUE_CLOSED,
   MEETING_APPROVED,
   TODO_COMPLETED,
   TODO_CREATED,
   TODO_REOPENED,
+  type DomainEvent,
 } from '../../events/domain-event';
 import { OutboxService } from '../outbox/outbox.service';
 import { CreateTodoDto, UpdateTodoStatusDto } from './dto/todo.dto';
@@ -78,6 +81,31 @@ export class TodoService implements OnModuleInit {
         `Synced ${created} todo(s) from meeting ${sync.meetingId}.`,
       );
     }
+  }
+
+  /**
+   * Close the loop: an issue closed on GitHub completes the todo that mirrors
+   * it. Matched by externalUrl; already-done todos are left untouched.
+   */
+  @OnEvent(GITHUB_ISSUE_CLOSED)
+  async onGithubIssueClosed(event: DomainEvent): Promise<void> {
+    const url = event.payload.url;
+    if (typeof url !== 'string') return;
+    const [completed] = await this.db
+      .update(todos)
+      .set({ status: 'DONE', completedAt: new Date() })
+      .where(and(eq(todos.externalUrl, url), eq(todos.status, 'OPEN')))
+      .returning();
+    if (!completed) return;
+
+    this.events.emit({
+      type: TODO_COMPLETED,
+      projectId: completed.projectId,
+      actor: { kind: 'integration', id: 'github' },
+      source: 'todo',
+      payload: { todoId: completed.id, title: completed.title, via: 'github' },
+    });
+    this.logger.log(`todo "${completed.title}" completed via GitHub issue close`);
   }
 
   async create(projectId: string, dto: CreateTodoDto): Promise<Todo> {

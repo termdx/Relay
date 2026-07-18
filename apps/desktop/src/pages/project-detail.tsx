@@ -37,6 +37,12 @@ const EVENT_LABELS: Record<string, string> = {
   "todo.reopened": "Todo reopened",
   "decision.recorded": "Decision recorded",
   "notification.sent": "Client emailed",
+  "github.push": "Commits pushed",
+  "github.pr_opened": "PR opened",
+  "github.pr_merged": "PR merged",
+  "github.pr_closed": "PR closed",
+  "github.issue_opened": "Issue opened",
+  "github.issue_closed": "Issue closed",
 };
 
 function actorIcon(actor: TimelineActor) {

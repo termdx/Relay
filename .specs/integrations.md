@@ -24,7 +24,7 @@ encrypted secret store; manifests and code never contain values.
 
 | Integration | Direction | Purpose | Status |
 |---|---|---|---|
-| GitHub | both | issues out; commits/PRs/reviews in | adapter shipped (real REST + stub, token-selected) |
+| GitHub | both | issues out; commits/PRs/issues in (webhooks) | shipped both directions — issue close auto-completes the mirrored todo |
 | GitLab | both | same as GitHub | planned |
 | Bitbucket | both | same as GitHub | planned |
 | Slack | both | notifications out; messages/decisions in | catalog entry only |

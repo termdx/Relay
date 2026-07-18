@@ -1,6 +1,8 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GITHUB_ISSUE_PUBLISHER } from './github-issue-publisher';
+import { GithubWebhookController } from './github-webhook.controller';
+import { GithubWebhookService } from './github-webhook.service';
 import { HttpGithubIssuePublisher } from './http-github-issue-publisher';
 import { StubGithubIssuePublisher } from './stub-github-issue-publisher';
 
@@ -11,7 +13,9 @@ import { StubGithubIssuePublisher } from './stub-github-issue-publisher';
  * (github.token) or plain env in dev.
  */
 @Module({
+  controllers: [GithubWebhookController],
   providers: [
+    GithubWebhookService,
     HttpGithubIssuePublisher,
     StubGithubIssuePublisher,
     {
