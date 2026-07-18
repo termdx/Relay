@@ -28,6 +28,8 @@ const ICONS: Record<Kind, React.ReactNode> = {
   plain: <Info className="size-4.5 shrink-0 text-muted-foreground" />,
 };
 
+/** Exactly the AgentDoneToast shell — same width, padding, and structure —
+ * so every toast in the app is visually one component. */
 function ToastCard({
   kind,
   message,
@@ -40,24 +42,26 @@ function ToastCard({
   onDismiss: () => void;
 }) {
   return (
-    <div className="flex w-[380px] max-w-[90vw] items-center gap-2.5 rounded-lg border border-border bg-card p-3.5 shadow-lg">
-      {ICONS[kind]}
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">{message}</div>
-        {description ? (
-          <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
-        ) : null}
+    <div className="w-[420px] max-w-[90vw] rounded-lg border border-border bg-card p-3.5 shadow-lg">
+      <div className="flex items-center gap-2.5">
+        {ICONS[kind]}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">{message}</div>
+          {description ? (
+            <div className="text-xs text-muted-foreground">{description}</div>
+          ) : null}
+        </div>
+        {kind !== "loading" && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss"
+            className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
-      {kind !== "loading" && (
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label="Dismiss"
-          className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
-      )}
     </div>
   );
 }
