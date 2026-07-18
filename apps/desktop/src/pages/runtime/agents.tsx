@@ -13,7 +13,8 @@ import {
   XCircle,
 } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
+import { appUnfocused, nativeNotify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -325,6 +326,18 @@ function AgentRunWatcher({
         if (!announced.current) {
           announced.current = true;
           toast.dismiss(toastId);
+          const failures = results.filter((r) => r.status === "FAILED").length;
+          if (appUnfocused()) {
+            void nativeNotify(
+              failures === 0
+                ? `${agent.name} did its work`
+                : `${agent.name} finished with ${failures} failure(s)`,
+              results
+                .map((r) => (r.output ?? r.error ?? "").slice(0, 120))
+                .join(" · ")
+                .slice(0, 240),
+            );
+          }
           toast.custom(
             (t) => (
               <AgentDoneToast

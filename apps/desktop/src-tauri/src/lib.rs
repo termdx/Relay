@@ -13,6 +13,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // In dev the daemon is started by `pnpm dev`; only the packaged app
             // owns its own daemon, so the two never fight over :51720.
