@@ -93,6 +93,20 @@ export interface IntegrationManifest {
   credentials: { name: string; secretRef: string; required: boolean }[];
 }
 
+export interface GithubDeviceStart {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  interval: number;
+  expiresIn: number;
+}
+
+export interface GithubDevicePoll {
+  status: "pending" | "complete" | "error";
+  interval?: number;
+  message?: string;
+}
+
 export interface Diagnostic {
   level: "error" | "warning";
   code: string;
@@ -161,6 +175,16 @@ export const runtime = {
       rpc<void>(["integrations", "remove"], [cwd, id]),
     health: (cwd: string, id: string) =>
       rpc<IntegrationHealth>(["integrations", "health"], [cwd, id]),
+    githubDeviceStart: (cwd: string, clientId?: string) =>
+      rpc<GithubDeviceStart>(
+        ["integrations", "githubDeviceStart"],
+        [cwd, clientId],
+      ),
+    githubDevicePoll: (cwd: string, deviceCode: string) =>
+      rpc<GithubDevicePoll>(
+        ["integrations", "githubDevicePoll"],
+        [cwd, deviceCode],
+      ),
   },
   workflows: {
     list: (cwd: string) => rpc<{ id: string; version: string; module?: string }[]>(["workflows", "list"], [cwd]),

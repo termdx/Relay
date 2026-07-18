@@ -110,6 +110,20 @@ export interface AgentsApi {
   remove(cwd: string, id: string): Promise<void>;
 }
 
+export interface GithubDeviceStartResult {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  interval: number;
+  expiresIn: number;
+}
+
+export interface GithubDevicePollResult {
+  status: 'pending' | 'complete' | 'error';
+  interval?: number;
+  message?: string;
+}
+
 export interface IntegrationsApi {
   catalog(cwd: string): Promise<IntegrationManifest[]>;
   list(cwd: string): Promise<IntegrationManifest[]>;
@@ -121,6 +135,16 @@ export interface IntegrationsApi {
   ): Promise<IntegrationManifest>;
   remove(cwd: string, id: string): Promise<void>;
   health(cwd: string, id: string): Promise<IntegrationHealth>;
+  /** OAuth device flow — the no-paste GitHub connect. Tokens never round-trip:
+   * on completion the runtime stores them and installs the integration. */
+  githubDeviceStart(
+    cwd: string,
+    clientId?: string,
+  ): Promise<GithubDeviceStartResult>;
+  githubDevicePoll(
+    cwd: string,
+    deviceCode: string,
+  ): Promise<GithubDevicePollResult>;
 }
 
 export interface ComposeApi {

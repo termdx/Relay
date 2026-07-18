@@ -89,6 +89,55 @@ export function registerIntegration(program: Command): void {
     });
 
   integration
+    .command('connect <id>')
+    .description('Connect via OAuth device flow (github) — no token pasting')
+    .option('--client-id <id>', 'GitHub OAuth app client id (remembered)')
+    .action((id: string, options: { clientId?: string }) => {
+      run(async () => {
+        if (id !== 'github') {
+          p.log.error(`Device flow is only available for "github" today. Use: relay integration add ${id}`);
+          process.exitCode = 1;
+          return;
+        }
+        const client = getClient();
+        const flow = await client.integrations.githubDeviceStart(
+          process.cwd(),
+          options.clientId,
+        );
+
+        p.note(
+          `Code: ${flow.userCode}\nOpen: ${flow.verificationUri}`,
+          'Enter this code on GitHub',
+        );
+
+        const spinner = p.spinner();
+        spinner.start('Waiting for authorization…');
+        const deadline = Date.now() + flow.expiresIn * 1000;
+        let interval = Math.max(flow.interval, 5);
+
+        while (Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, interval * 1000));
+          const res = await client.integrations.githubDevicePoll(
+            process.cwd(),
+            flow.deviceCode,
+          );
+          if (res.status === 'complete') {
+            spinner.stop('GitHub connected — token stored in secrets');
+            return;
+          }
+          if (res.status === 'error') {
+            spinner.stop(res.message ?? 'Authorization failed', 1);
+            process.exitCode = 1;
+            return;
+          }
+          interval = res.interval ?? interval;
+        }
+        spinner.stop('The code expired — run the command again.', 1);
+        process.exitCode = 1;
+      });
+    });
+
+  integration
     .command('remove <id>')
     .description('Remove an integration (and its stored credentials)')
     .action((id: string) => {

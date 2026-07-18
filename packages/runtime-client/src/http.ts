@@ -96,6 +96,10 @@ export class HttpClient implements RuntimeApi {
       this.rpc(['integrations', 'add'], [cwd, id, credentials]),
     remove: (cwd, id) => this.rpc(['integrations', 'remove'], [cwd, id]),
     health: (cwd, id) => this.rpc(['integrations', 'health'], [cwd, id]),
+    githubDeviceStart: (cwd, clientId) =>
+      this.rpc(['integrations', 'githubDeviceStart'], [cwd, clientId]),
+    githubDevicePoll: (cwd, deviceCode) =>
+      this.rpc(['integrations', 'githubDevicePoll'], [cwd, deviceCode]),
   };
 
   readonly compose: ComposeApi = {

@@ -16,6 +16,7 @@ export * from './registries/ai-provider-registry';
 export * from './registries/provider-health';
 export * from './registries/module-registry';
 export * from './registries/integration-registry';
+export * from './integrations/github-device';
 export * from './registries/workflow-registry';
 export * from './registries/agent-registry';
 export * from './scaffold/scaffolder';

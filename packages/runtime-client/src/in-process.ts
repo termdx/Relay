@@ -152,6 +152,10 @@ export class InProcessClient implements RuntimeApi {
     },
     health: async (cwd, id) =>
       (await RuntimeEngine.open(cwd)).integrations.health(id),
+    githubDeviceStart: async (cwd, clientId) =>
+      (await RuntimeEngine.open(cwd)).githubDeviceStart(clientId),
+    githubDevicePoll: async (cwd, deviceCode) =>
+      (await RuntimeEngine.open(cwd)).githubDevicePoll(deviceCode),
   };
 
   readonly compose: ComposeApi = {

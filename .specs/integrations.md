@@ -33,6 +33,17 @@ encrypted secret store; manifests and code never contain values.
 | SMTP | out | approval links, weekly digests, portal invites | adapter shipped (nodemailer, SMTP_URL-selected) |
 | Amazon S3 | out | images, attachments, recordings | planned |
 
+## Connecting
+
+- **OAuth device flow first** (GitHub today; GitLab/Bitbucket/Google follow
+  the same pattern): "Sign in with GitHub" → short code → github.com → done.
+  Device flow needs only a public client id — no secret, no redirect server —
+  so it works self-hosted. The runtime performs both legs; the token goes
+  straight into the encrypted secret store and never round-trips through the
+  UI. The OAuth app client id is remembered per workspace
+  (RELAY_GITHUB_CLIENT_ID as deploy-wide default).
+- **Token paste stays as the fallback** (CI, fine-grained PATs, air-gapped).
+
 ## Rules
 
 - **Inbound**: webhook receivers normalize vendor payloads into domain events

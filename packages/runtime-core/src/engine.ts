@@ -13,6 +13,11 @@ import {
 import { inspectHealth, type RuntimeHealth } from './health/health-monitor';
 import { ServiceLifecycle } from './lifecycle/service-lifecycle';
 import { ManifestStore } from './manifest/manifest-store';
+import {
+  pollGithubDeviceFlow,
+  startGithubDeviceFlow,
+  type GithubDeviceStart,
+} from './integrations/github-device';
 import { AgentRegistry, type CreateAgentInput } from './registries/agent-registry';
 import { AiProviderRegistry } from './registries/ai-provider-registry';
 import { IntegrationRegistry } from './registries/integration-registry';
@@ -171,6 +176,50 @@ export class RuntimeEngine {
       },
       withDependencies,
     );
+  }
+
+  /**
+   * Begin the GitHub device flow. The client id is remembered (secret
+   * github.clientId) so subsequent connects need no input; RELAY_GITHUB_CLIENT_ID
+   * serves as a deploy-wide default.
+   */
+  async githubDeviceStart(clientId?: string): Promise<GithubDeviceStart> {
+    const resolved =
+      clientId?.trim() ||
+      (await this.secrets.get('github.clientId')) ||
+      process.env.RELAY_GITHUB_CLIENT_ID;
+    if (!resolved) {
+      throw new Error(
+        'No GitHub OAuth client id configured. Create a GitHub OAuth app ' +
+          '(any callback URL, "Enable Device Flow" checked) and paste its ' +
+          'client id — Relay remembers it after the first connect.',
+      );
+    }
+    const flow = await startGithubDeviceFlow(resolved);
+    await this.secrets.set('github.clientId', resolved);
+    return flow;
+  }
+
+  /**
+   * One poll of the device flow. On success the token is stored and the
+   * github integration installed — the token itself is never returned.
+   */
+  async githubDevicePoll(
+    deviceCode: string,
+  ): Promise<{ status: 'pending' | 'complete' | 'error'; interval?: number; message?: string }> {
+    const clientId = await this.secrets.get('github.clientId');
+    if (!clientId) {
+      return { status: 'error', message: 'Device flow was never started.' };
+    }
+    const result = await pollGithubDeviceFlow(clientId, deviceCode);
+    if (result.status === 'complete') {
+      await this.integrations.add('github', { token: result.token });
+      return { status: 'complete' };
+    }
+    if (result.status === 'pending') {
+      return { status: 'pending', interval: result.interval };
+    }
+    return { status: 'error', message: result.message };
   }
 
   /** Validate the whole workspace, returning diagnostics (empty = healthy). */

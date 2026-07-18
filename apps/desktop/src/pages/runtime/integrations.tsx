@@ -165,6 +165,8 @@ function ConnectDialog({
   onOpenChange: (v: boolean) => void;
   onConnected: () => void;
 }) {
+  // GitHub gets the OAuth device flow; a token paste remains the fallback.
+  const [useToken, setUseToken] = React.useState(manifest.id !== "github");
   const [values, setValues] = React.useState<Record<string, string>>({});
 
   const connect = useMutation({
@@ -189,34 +191,205 @@ function ConnectDialog({
             Credentials are stored in the workspace secrets, never in a manifest.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4">
-          {manifest.credentials.map((cred) => (
-            <div key={cred.name} className="flex flex-col gap-1.5">
-              <Label htmlFor={cred.name}>
-                {cred.name}
-                {cred.required && <span className="text-destructive"> *</span>}
-              </Label>
-              <Input
-                id={cred.name}
-                type="password"
-                value={values[cred.name] ?? ""}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, [cred.name]: e.target.value }))
-                }
-              />
+
+        {manifest.id === "github" && !useToken ? (
+          <GithubDeviceConnect
+            cwd={cwd}
+            onConnected={onConnected}
+            onUseToken={() => setUseToken(true)}
+          />
+        ) : (
+          <>
+            <div className="flex flex-col gap-4">
+              {manifest.credentials.map((cred) => (
+                <div key={cred.name} className="flex flex-col gap-1.5">
+                  <Label htmlFor={cred.name}>
+                    {cred.name}
+                    {cred.required && <span className="text-destructive"> *</span>}
+                  </Label>
+                  <Input
+                    id={cred.name}
+                    type="password"
+                    value={values[cred.name] ?? ""}
+                    onChange={(e) =>
+                      setValues((v) => ({ ...v, [cred.name]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <DialogFooter>
-          <Button
-            onClick={() => connect.mutate()}
-            disabled={connect.isPending || missingRequired}
-          >
-            {connect.isPending && <Spinner className="size-4" />}
-            Connect
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="items-center">
+              {manifest.id === "github" && (
+                <button
+                  type="button"
+                  className="mr-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+                  onClick={() => setUseToken(false)}
+                >
+                  Use GitHub sign-in instead
+                </button>
+              )}
+              <Button
+                onClick={() => connect.mutate()}
+                disabled={connect.isPending || missingRequired}
+              >
+                {connect.isPending && <Spinner className="size-4" />}
+                Connect
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+type DeviceFlowState =
+  | { phase: "idle" }
+  | { phase: "starting" }
+  | {
+      phase: "waiting";
+      userCode: string;
+      verificationUri: string;
+      deviceCode: string;
+      interval: number;
+    };
+
+/**
+ * OAuth device flow: request a code, the user enters it on github.com, we
+ * poll until GitHub confirms. The token never reaches this UI — the runtime
+ * stores it and installs the integration server-side.
+ */
+function GithubDeviceConnect({
+  cwd,
+  onConnected,
+  onUseToken,
+}: {
+  cwd: string;
+  onConnected: () => void;
+  onUseToken: () => void;
+}) {
+  const [state, setState] = React.useState<DeviceFlowState>({ phase: "idle" });
+  const [clientId, setClientId] = React.useState("");
+  const [needsClientId, setNeedsClientId] = React.useState(false);
+
+  async function start() {
+    setState({ phase: "starting" });
+    try {
+      const flow = await runtime.integrations.githubDeviceStart(
+        cwd,
+        clientId.trim() || undefined,
+      );
+      setState({
+        phase: "waiting",
+        userCode: flow.userCode,
+        verificationUri: flow.verificationUri,
+        deviceCode: flow.deviceCode,
+        interval: Math.max(flow.interval, 5),
+      });
+    } catch (e) {
+      const message = e instanceof RuntimeError ? e.message : "Could not start";
+      if (message.includes("client id")) setNeedsClientId(true);
+      else toast.error(message);
+      setState({ phase: "idle" });
+    }
+  }
+
+  // Poll while waiting; GitHub dictates the cadence.
+  React.useEffect(() => {
+    if (state.phase !== "waiting") return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await runtime.integrations.githubDevicePoll(
+          cwd,
+          state.deviceCode,
+        );
+        if (cancelled) return;
+        if (res.status === "complete") {
+          toast.success("GitHub connected");
+          onConnected();
+        } else if (res.status === "error") {
+          toast.error(res.message ?? "Authorization failed");
+          setState({ phase: "idle" });
+        } else {
+          // re-arm the effect (interval may have grown on slow_down)
+          setState((s) =>
+            s.phase === "waiting"
+              ? { ...s, interval: res.interval ?? s.interval }
+              : s,
+          );
+        }
+      } catch {
+        if (!cancelled) setState((s) => ({ ...s })); // retry next tick
+      }
+    }, state.interval * 1000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [state, cwd, onConnected]);
+
+  if (state.phase === "waiting") {
+    return (
+      <div className="flex flex-col items-center gap-4 py-2">
+        <p className="text-sm text-muted-foreground">
+          Enter this code on GitHub to connect:
+        </p>
+        <div className="select-all rounded-lg border border-border bg-muted/40 px-6 py-3 text-center font-mono text-2xl font-semibold tracking-[0.3em]">
+          {state.userCode}
+        </div>
+        <Button asChild>
+          <a href={state.verificationUri} target="_blank" rel="noreferrer">
+            Open github.com/login/device
+          </a>
+        </Button>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Spinner className="size-3.5" />
+          Waiting for you to authorize…
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        Sign in with GitHub — no tokens to create or paste. You’ll get a short
+        code to enter on github.com.
+      </p>
+      {needsClientId && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="gh-client-id">OAuth app client ID</Label>
+          <Input
+            id="gh-client-id"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            placeholder="Iv1. or Ov23li…"
+            autoFocus
+          />
+          <p className="text-xs text-muted-foreground">
+            One-time setup: GitHub → Settings → Developer settings → OAuth
+            Apps → New. Any callback URL; check “Enable Device Flow”. Relay
+            remembers the ID after this.
+          </p>
+        </div>
+      )}
+      <DialogFooter className="items-center">
+        <button
+          type="button"
+          className="mr-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+          onClick={onUseToken}
+        >
+          Use a token instead
+        </button>
+        <Button
+          onClick={() => void start()}
+          disabled={state.phase === "starting" || (needsClientId && !clientId.trim())}
+        >
+          {state.phase === "starting" && <Spinner className="size-4" />}
+          Sign in with GitHub
+        </Button>
+      </DialogFooter>
+    </div>
   );
 }
