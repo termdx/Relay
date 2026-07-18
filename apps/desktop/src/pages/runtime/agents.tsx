@@ -82,7 +82,7 @@ export function RuntimeAgentsPage() {
       <div>
         <SectionHead
           title="Agents"
-          subtitle="LangGraph agents. Scaffolds a manifest + starter code."
+          subtitle="Agents. Scaffolds a manifest + starter code."
           action={
             <Button variant="outline" onClick={() => setNewAgent(true)}>
               <Plus className="size-4" />
@@ -225,7 +225,7 @@ function NewAgentDialog({
     mutationFn: () =>
       runtime.agents.create(cwd, { id: slug(name), name, model }),
     onSuccess: () => {
-      toast.success("Agent scaffolded (+ LangGraph starter)");
+      toast.success("Agent scaffolded (+ starter code)");
       onDone();
       onOpenChange(false);
       setName("");
