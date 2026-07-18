@@ -320,7 +320,7 @@ function PoweredBy({ className = "" }: { className?: string }) {
     <span
       className={`inline-flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground ${className}`}
     >
-      <img src="/relay-logo.png" alt="" className="size-3.5" />
+      <img src="/relay-logo.png" alt="" className="size-10.5" />
       Powered by Relay
     </span>
   );
@@ -647,7 +647,7 @@ function Ask({ projectId }: { projectId: string }) {
           Ask anything about your project — answers come from its real history.
         </p>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-          <img src="/relay-logo.png" alt="" className="size-3.5" />
+          <img src="/relay-logo.png" alt="" className="size-10.5" />
           Powered by Relay AI
         </span>
       </div>
