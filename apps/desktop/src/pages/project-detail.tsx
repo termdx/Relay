@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
+import { openExternal } from "@/lib/open";
 import { cn } from "@/lib/utils";
 import type { TimelineActor, TimelineEvent, Todo } from "@/lib/api/types";
 
@@ -250,15 +251,14 @@ function TodosSection({ projectId }: { projectId: string }) {
                 </Badge>
               ) : null}
               {todo.externalUrl ? (
-                <a
-                  href={todo.externalUrl}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void openExternal(todo.externalUrl!)}
                   className="shrink-0 text-muted-foreground hover:text-foreground"
                   aria-label="Open linked issue"
                 >
                   <ExternalLink className="size-3.5" />
-                </a>
+                </button>
               ) : null}
             </li>
           ))}

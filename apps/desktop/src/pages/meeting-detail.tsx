@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { openExternal } from "@/lib/open";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
 import type { Meeting } from "@/lib/api/types";
@@ -228,15 +229,16 @@ function MeetingReview({
                     className="h-8 max-w-48 text-xs"
                   />
                   {meeting.tasks[i]?.githubIssueUrl && (
-                    <a
-                      href={meeting.tasks[i]!.githubIssueUrl!}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void openExternal(meeting.tasks[i]!.githubIssueUrl!)
+                      }
                       className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                     >
                       <ExternalLink className="size-3" />
                       issue
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>

@@ -19,6 +19,7 @@ import {
   RuntimeError,
   type IntegrationManifest,
 } from "@/lib/api/runtime";
+import { openExternal } from "@/lib/open";
 import { useRuntimeWorkspace } from "@/lib/runtime-workspace";
 import { Empty, SectionHead } from "./ai";
 
@@ -338,11 +339,12 @@ function GithubDeviceConnect({
         <div className="select-all rounded-lg border border-border bg-muted/40 px-6 py-3 text-center font-mono text-2xl font-semibold tracking-[0.3em]">
           {state.userCode}
         </div>
-        <Button asChild>
-          <a href={state.verificationUri} target="_blank" rel="noreferrer">
-            Open github.com/login/device
-          </a>
+        <Button onClick={() => void openExternal(state.verificationUri)}>
+          Open github.com/login/device
         </Button>
+        <p className="select-all font-mono text-xs text-muted-foreground">
+          {state.verificationUri}
+        </p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Spinner className="size-3.5" />
           Waiting for you to authorize…
