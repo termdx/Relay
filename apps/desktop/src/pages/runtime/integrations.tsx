@@ -1,8 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Plug, Trash2 } from "lucide-react";
+import { Activity, Eye, EyeOff, Plug, Trash2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -193,7 +200,9 @@ function ConnectDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {manifest.id === "github" && !useToken ? (
+        {manifest.id === "smtp" ? (
+          <SmtpConnect cwd={cwd} onConnected={onConnected} />
+        ) : manifest.id === "github" && !useToken ? (
           <GithubDeviceConnect
             cwd={cwd}
             onConnected={onConnected}
@@ -241,6 +250,220 @@ function ConnectDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface SmtpProvider {
+  id: string;
+  label: string;
+  host?: string;
+  port?: number;
+  /** Username is fixed (Resend) or mirrors the key (Postmark). */
+  fixedUser?: string;
+  userIsKey?: boolean;
+  userLabel?: string;
+  userPlaceholder?: string;
+  keyLabel: string;
+  keyHint?: string;
+  custom?: boolean;
+}
+
+const SMTP_PROVIDERS: SmtpProvider[] = [
+  {
+    id: "resend",
+    label: "Resend",
+    host: "smtp.resend.com",
+    port: 465,
+    fixedUser: "resend",
+    keyLabel: "API key",
+    keyHint: "re_… key from resend.com/api-keys",
+  },
+  {
+    id: "gmail",
+    label: "Gmail / Google Workspace",
+    host: "smtp.gmail.com",
+    port: 465,
+    userLabel: "Gmail address",
+    userPlaceholder: "you@gmail.com",
+    keyLabel: "App password",
+    keyHint: "Create one at myaccount.google.com/apppasswords — not your real password",
+  },
+  {
+    id: "mailgun",
+    label: "Mailgun",
+    host: "smtp.mailgun.org",
+    port: 465,
+    userLabel: "SMTP login",
+    userPlaceholder: "postmaster@mg.yourdomain.com",
+    keyLabel: "SMTP password",
+  },
+  {
+    id: "brevo",
+    label: "Brevo",
+    host: "smtp-relay.brevo.com",
+    port: 587,
+    userLabel: "Login email",
+    userPlaceholder: "you@company.com",
+    keyLabel: "SMTP key",
+  },
+  {
+    id: "postmark",
+    label: "Postmark",
+    host: "smtp.postmarkapp.com",
+    port: 587,
+    userIsKey: true,
+    keyLabel: "Server token",
+  },
+  { id: "custom", label: "Custom SMTP server", custom: true, keyLabel: "Password" },
+];
+
+/**
+ * Provider-aware SMTP connect: pick a provider, paste the key — the dialog
+ * composes the smtp(s):// URL itself (465 → smtps, else smtp; credentials
+ * URL-encoded). Everything still lands in the same smtp.url secret.
+ */
+function SmtpConnect({
+  cwd,
+  onConnected,
+}: {
+  cwd: string;
+  onConnected: () => void;
+}) {
+  const [providerId, setProviderId] = React.useState("resend");
+  const [user, setUser] = React.useState("");
+  const [secret, setSecret] = React.useState("");
+  const [showSecret, setShowSecret] = React.useState(false);
+  const [host, setHost] = React.useState("");
+  const [port, setPort] = React.useState("587");
+  const [from, setFrom] = React.useState("");
+
+  const provider = SMTP_PROVIDERS.find((p) => p.id === providerId)!;
+
+  const connect = useMutation({
+    mutationFn: () => {
+      const effectiveHost = provider.custom ? host.trim() : provider.host!;
+      const effectivePort = provider.custom ? Number(port) : provider.port!;
+      const effectiveUser = provider.fixedUser ?? (provider.userIsKey ? secret : user.trim());
+      const scheme = effectivePort === 465 ? "smtps" : "smtp";
+      const url = `${scheme}://${encodeURIComponent(effectiveUser)}:${encodeURIComponent(secret)}@${effectiveHost}:${effectivePort}`;
+      return runtime.integrations.add(cwd, "smtp", {
+        url,
+        ...(from.trim() ? { from: from.trim() } : {}),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Email connected — restart the stack to start sending");
+      onConnected();
+    },
+    onError: (e) =>
+      toast.error(e instanceof RuntimeError ? e.message : "Connect failed"),
+  });
+
+  const missing =
+    !secret.trim() ||
+    (provider.custom && (!host.trim() || !Number(port))) ||
+    (!provider.fixedUser && !provider.userIsKey && !provider.custom && !user.trim()) ||
+    (provider.custom && !user.trim());
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label>Provider</Label>
+        <Select value={providerId} onValueChange={setProviderId}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SMTP_PROVIDERS.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {provider.custom && (
+        <div className="grid grid-cols-[1fr_6rem] gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="smtp-host">Host</Label>
+            <Input
+              id="smtp-host"
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              placeholder="mail.yourserver.com"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="smtp-port">Port</Label>
+            <Input
+              id="smtp-port"
+              value={port}
+              onChange={(e) => setPort(e.target.value)}
+              inputMode="numeric"
+              placeholder="587"
+            />
+          </div>
+        </div>
+      )}
+
+      {!provider.fixedUser && !provider.userIsKey && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="smtp-user">{provider.userLabel ?? "Username"}</Label>
+          <Input
+            id="smtp-user"
+            value={user}
+            onChange={(e) => setUser(e.target.value)}
+            placeholder={provider.userPlaceholder ?? ""}
+          />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="smtp-secret">{provider.keyLabel}</Label>
+        <div className="relative">
+          <Input
+            id="smtp-secret"
+            type={showSecret ? "text" : "password"}
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            className="pr-10"
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            onClick={() => setShowSecret((v) => !v)}
+            aria-label={showSecret ? "Hide" : "Show"}
+            className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
+          >
+            {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
+        {provider.keyHint && (
+          <p className="text-xs text-muted-foreground">{provider.keyHint}</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="smtp-from">Send as</Label>
+        <Input
+          id="smtp-from"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          placeholder="TermDX Studio <hello@termdx.studio>"
+        />
+        <p className="text-xs text-muted-foreground">
+          Must be an address your provider allows sending from.
+        </p>
+      </div>
+
+      <DialogFooter>
+        <Button onClick={() => connect.mutate()} disabled={connect.isPending || missing}>
+          {connect.isPending && <Spinner className="size-4" />}
+          Connect email
+        </Button>
+      </DialogFooter>
+    </div>
   );
 }
 
