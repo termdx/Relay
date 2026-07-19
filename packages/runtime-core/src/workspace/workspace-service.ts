@@ -13,6 +13,8 @@ export interface InitOptions {
   storagePath?: string;
   desktop?: boolean;
   telemetry?: boolean;
+  /** Compose project/network name — must be unique per workspace on a host. */
+  networkName?: string;
 }
 
 const WORKSPACE_GITIGNORE = `# Relay workspace — runtime-managed. Do not edit generated files by hand.
@@ -49,6 +51,7 @@ export class WorkspaceService {
     const config = relayConfigSchema.parse({
       organization: { name: opts.organization, slug: opts.slug },
       runtime: { mode: opts.mode ?? 'local', version: '0.1.0' },
+      ...(opts.networkName ? { network: { name: opts.networkName } } : {}),
       storage: { path: opts.storagePath ?? './data' },
       desktop: { enabled: opts.desktop ?? true },
       telemetry: { enabled: opts.telemetry ?? false },

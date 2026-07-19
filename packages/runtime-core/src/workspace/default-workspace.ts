@@ -1,10 +1,21 @@
 import { mkdir, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { RuntimeEngine } from '../engine';
 import { AlreadyExistsError } from '../errors';
 import { fileExists } from '../util/fs';
 import { RELAY_YAML } from './paths';
 import { WorkspaceService } from './workspace-service';
+
+/**
+ * Every workspace starts with the base `projects` module — it carries the
+ * backend + postgres services, so `runtime.up` on a brand-new workspace has
+ * something to run instead of failing on an empty compose file.
+ */
+async function installBaseModule(root: string): Promise<void> {
+  const engine = await RuntimeEngine.open(root);
+  await engine.addModule('projects', true);
+}
 
 /**
  * A well-known home for workspaces, so the daemon never depends on the
@@ -40,6 +51,7 @@ export async function ensureDefaultWorkspace(
     return { root, created: false };
   }
   await WorkspaceService.init(root, { organization });
+  await installBaseModule(root);
   return { root, created: true };
 }
 
@@ -93,7 +105,12 @@ export async function createWorkspace(
   if (await fileExists(join(root, RELAY_YAML))) {
     throw new AlreadyExistsError('workspace', name);
   }
-  await WorkspaceService.init(root, { organization });
+  // Compose project names must be unique per host — a second workspace with
+  // project "relay" would silently take over the first one's containers.
+  const networkName =
+    name === DEFAULT_WORKSPACE_NAME ? 'relay' : `relay-${name}`;
+  await WorkspaceService.init(root, { organization, networkName });
+  await installBaseModule(root);
   return {
     name,
     root,
