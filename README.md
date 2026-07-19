@@ -126,6 +126,11 @@ The server installer mirrors the desktop bundles at
 `https://<domain>/downloads/` (browsable), so teammates never wait on
 GitHub's CDN — grab `Relay.dmg` / `relay-desktop.deb` directly from there.
 
+> **macOS says "Relay is damaged"?** The app is unsigned for now, and
+> browser-downloaded files get quarantined, which macOS reports as damage.
+> Fix: `xattr -cr /Applications/Relay.app` (the `curl | bash` installer
+> avoids this — curl doesn't set the quarantine flag).
+
 macOS gets the `.dmg`, Linux the `.deb`. On first run the app uses the
 local stack; to work against an agency server open **Settings → Agency
 server** and enter the Backend URL (`https://relay.youragency.com/api`),

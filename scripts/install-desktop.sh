@@ -48,6 +48,9 @@ case "$OS" in
     fetch "Relay.dmg" ".dmg" /tmp/Relay.dmg
     say "opening the installer — drag Relay into Applications."
     open /tmp/Relay.dmg
+    say "The app is unsigned for now — if macOS reports it as \"damaged\""
+    say "(happens with browser downloads), clear the quarantine flag:"
+    say "  xattr -cr /Applications/Relay.app"
     ;;
   Linux)
     fetch "relay-desktop.deb" ".deb" /tmp/relay-desktop.deb
