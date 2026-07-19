@@ -26,13 +26,13 @@ case "$OS" in
     open /tmp/Relay.dmg
     ;;
   Linux)
-    URL=$(asset_url ".AppImage")
-    [ -n "$URL" ] || die "no .AppImage in the latest release — push to the dist branch first."
-    mkdir -p "$HOME/.local/bin"
-    say "installing → ~/.local/bin/relay-desktop"
-    curl -fsSL "$URL" -o "$HOME/.local/bin/relay-desktop"
-    chmod +x "$HOME/.local/bin/relay-desktop"
-    say "run it with: relay-desktop"
+    URL=$(asset_url ".deb")
+    [ -n "$URL" ] || die "no .deb in the latest release — push to the dist branch first."
+    say "downloading $(basename "$URL")…"
+    curl -fsSL "$URL" -o /tmp/relay-desktop.deb
+    say "installing (needs sudo)…"
+    sudo apt-get install -y /tmp/relay-desktop.deb || sudo dpkg -i /tmp/relay-desktop.deb
+    say "installed — launch 'Relay' from your app menu."
     ;;
   *) die "unsupported platform: $OS" ;;
 esac

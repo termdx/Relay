@@ -45,11 +45,13 @@ jobs:
       matrix:
         include:
           - os: macos-14
+            args: ""
             bundles: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          # deb only: linuxdeploy (AppImage tooling) runs ldd over every
+          # executable and aborts on the bun-compiled sidecar.
           - os: ubuntu-latest
-            bundles: |
-              apps/desktop/src-tauri/target/release/bundle/deb/*.deb
-              apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            args: --bundles deb
+            bundles: apps/desktop/src-tauri/target/release/bundle/deb/*.deb
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -68,13 +70,7 @@ jobs:
         with: { workspaces: apps/desktop/src-tauri }
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build-sidecar.mjs
-      - run: pnpm --filter @relay/desktop tauri build --verbose
-        env:
-          # linuxdeploy's strip pass breaks AppImage bundling on CI runners,
-          # and linuxdeploy is itself an AppImage — self-extract instead of
-          # FUSE-mounting (runners can't mount).
-          NO_STRIP: "true"
-          APPIMAGE_EXTRACT_AND_RUN: "1"
+      - run: pnpm --filter @relay/desktop tauri build ${{ matrix.args }}
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}

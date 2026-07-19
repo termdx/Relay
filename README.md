@@ -75,7 +75,7 @@ and attaches it to a release tagged `dist-<n>`:
 | Artifact | Built on |
 |---|---|
 | `relay-runtime-<triple>` — standalone runtime daemon binary (bun-compiled) | macOS arm64, Linux x64 |
-| Desktop bundles — `.dmg` / `.deb` + `.AppImage` (Tauri, sidecar included) | macOS arm64, Linux x64 |
+| Desktop bundles — `.dmg` / `.deb` (Tauri, sidecar included) | macOS arm64, Linux x64 |
 | `portal-dist.tar.gz` — client portal static bundle | any |
 | `ghcr.io/<owner>/relay-backend` — backend Docker image | any |
 
@@ -111,7 +111,7 @@ Requires Docker and DNS (`relay.youragency.com` → the box). The installer:
 curl -fsSL https://raw.githubusercontent.com/termdx/Relay/main/scripts/install-desktop.sh | bash
 ```
 
-macOS gets the `.dmg`, Linux an `.AppImage`. On first run the app uses the
+macOS gets the `.dmg`, Linux the `.deb`. On first run the app uses the
 local stack; to work against an agency server open **Settings → Agency
 server** and enter the Backend URL (`https://relay.youragency.com`), the
 Runtime URL, and the runtime token from the server installer. Reach the
