@@ -114,8 +114,17 @@ Requires Docker and DNS (`relay.youragency.com` → the box). The installer:
 ### Desktop install
 
 ```bash
+# from your agency's Relay server — fast, mirrored on their domain:
+curl -fsSL https://raw.githubusercontent.com/termdx/Relay/main/scripts/install-desktop.sh \
+  | bash -s -- --server https://relay.youragency.com
+
+# or straight from GitHub releases:
 curl -fsSL https://raw.githubusercontent.com/termdx/Relay/main/scripts/install-desktop.sh | bash
 ```
+
+The server installer mirrors the desktop bundles at
+`https://<domain>/downloads/` (browsable), so teammates never wait on
+GitHub's CDN — grab `Relay.dmg` / `relay-desktop.deb` directly from there.
 
 macOS gets the `.dmg`, Linux the `.deb`. On first run the app uses the
 local stack; to work against an agency server open **Settings → Agency
