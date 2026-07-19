@@ -16,5 +16,6 @@ Planned:
 - `orchestrator/` — Temporal workers/workflows. **System of Orchestration**.
   Retries, timers, approvals, long-running automation. Agent loops run as
   activities using provider SDKs' native tool-calling. No business logic.
-- `portal/` — the client-facing web app (`relay.<company>.com`): status,
-  approvals, and Relay AI chat grounded in the knowledge base.
+
+The client-facing portal (`relay.<company>.com`) shipped as `apps/portal` —
+a Vite/React SPA over the backend's scoped `/portal/*` API.
