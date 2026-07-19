@@ -5,6 +5,7 @@ import {
   Bot,
   Check,
   CircleUser,
+  Copy,
   ExternalLink,
   Eye,
   Gavel,
@@ -12,6 +13,7 @@ import {
   Plus,
   Sparkles,
   User,
+  Webhook,
 } from "lucide-react";
 import * as React from "react";
 import { Link, useParams } from "react-router-dom";
@@ -153,6 +155,8 @@ export function ProjectDetailPage() {
 
         <PortalSettingsCard project={p} />
 
+        <IngestCard projectId={p.id} />
+
         <div className="mb-8 grid gap-8 lg:grid-cols-2">
           <TodosSection projectId={p.id} />
           <DecisionsSection projectId={p.id} />
@@ -245,6 +249,51 @@ function AskSection({ projectId }: { projectId: string }) {
           ) : null}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/** The per-project transcript webhook — the zero-paste meeting intake. */
+function IngestCard({ projectId }: { projectId: string }) {
+  const ingest = useQuery({
+    queryKey: ["projects", projectId, "ingest-url"],
+    queryFn: () => backend.projects.ingestUrl(projectId),
+  });
+
+  async function copy() {
+    if (!ingest.data?.url) return;
+    await navigator.clipboard.writeText(ingest.data.url);
+    toast.success("Ingest URL copied");
+  }
+
+  return (
+    <section className="mb-8 rounded-lg border border-border bg-card p-4">
+      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <Webhook className="size-4" />
+        Transcript ingest
+      </h2>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Point your meeting notetaker (Fireflies, Fathom, Zapier, n8n…) at this
+        URL — POST {"{"}"title", "transcript"{"}"} and Relay drafts the meeting,
+        emails the client for approval, and files the tasks automatically.
+      </p>
+      {ingest.data?.url ? (
+        <div className="mt-3 flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs">
+            {ingest.data.url}
+          </code>
+          <Button variant="outline" size="sm" onClick={() => void copy()}>
+            <Copy className="size-4" />
+            Copy
+          </Button>
+        </div>
+      ) : ingest.isLoading ? (
+        <Spinner className="mt-3 size-4" />
+      ) : (
+        <p className="mt-3 text-xs text-warning">
+          No ingest secret yet — run `relay up` once.
+        </p>
+      )}
     </section>
   );
 }

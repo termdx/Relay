@@ -5,10 +5,14 @@ import { GithubModule } from '../integration/github/github.module';
 import { MeetingApprovalHandler } from './meeting-approval.handler';
 import { MeetingController } from './meeting.controller';
 import { MeetingService } from './meeting.service';
+import {
+  TranscriptIngestController,
+  TranscriptIngestHandler,
+} from './transcript-ingest.controller';
 
 @Module({
   imports: [AiModule, GithubModule, ApprovalModule],
-  controllers: [MeetingController],
-  providers: [MeetingService, MeetingApprovalHandler],
+  controllers: [MeetingController, TranscriptIngestController],
+  providers: [MeetingService, MeetingApprovalHandler, TranscriptIngestHandler],
 })
 export class MeetingModule {}

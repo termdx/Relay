@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, Upload } from "lucide-react";
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/lib/toast";
@@ -149,7 +149,26 @@ export function NewMeetingPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="transcript">Transcript</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="transcript">Transcript</Label>
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                <Upload className="size-3.5" />
+                Import file
+                <input
+                  type="file"
+                  accept=".txt,.md,.vtt,.srt,text/plain"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () =>
+                      setTranscript(String(reader.result ?? ""));
+                    reader.readAsText(file);
+                  }}
+                />
+              </label>
+            </div>
             <Textarea
               id="transcript"
               value={transcript}

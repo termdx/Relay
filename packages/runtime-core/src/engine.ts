@@ -287,6 +287,13 @@ export class RuntimeEngine {
         }
       }
     }
+    // Transcript ingest: every workspace gets a generated shared secret so
+    // notetakers/automation can POST transcripts (webhooks/transcript/:project).
+    env.INGEST_SECRET = await this.ensureSecret('ingest.secret', () =>
+      randomBytes(24).toString('base64url'),
+    );
+    integrationEnvKeys.push('INGEST_SECRET');
+
     // Tracker connected → the backend can receive its webhooks. Secrets are
     // generated here (not user-supplied), so they live outside the manifests'
     // credential lists.

@@ -44,6 +44,17 @@ encrypted secret store; manifests and code never contain values.
   (RELAY_GITHUB_CLIENT_ID as deploy-wide default).
 - **Token paste stays as the fallback** (CI, fine-grained PATs, air-gapped).
 
+## Transcript ingest
+
+Meetings enter without pasting: each project has an ingest URL
+(`POST /webhooks/transcript/:projectId?token=<INGEST_SECRET>`, body
+`{title?, transcript}`) — anything that can POST JSON (Fireflies, Fathom,
+Zapier, n8n, a shortcut) turns a call into a drafted meeting. The secret is
+workspace-generated (never user-supplied), the response is an immediate 202,
+and drafting runs durably on the outbox; client email + repo derive from the
+project. Copyable per-project URL on the desktop project page; the meeting
+form also imports transcript files directly.
+
 ## Rules
 
 - **Inbound**: webhook receivers normalize vendor payloads into domain events

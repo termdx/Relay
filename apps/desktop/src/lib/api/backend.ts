@@ -67,6 +67,8 @@ export const backend = {
       }),
     timeline: (id: string) =>
       backendRequest<TimelineEvent[]>(`/projects/${id}/timeline`),
+    ingestUrl: (id: string) =>
+      backendRequest<{ url: string | null }>(`/projects/${id}/ingest-url`),
     ask: (id: string, question: string) =>
       backendRequest<AskResult>(`/projects/${id}/ask`, {
         method: "POST",
