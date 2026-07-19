@@ -170,7 +170,7 @@ export function RuntimeAgentsPage() {
               <Row
                 key={w.id}
                 icon={Workflow}
-                title={w.id}
+                title={w.displayName ?? w.id}
                 meta={w.module ? `module: ${w.module}` : `v${w.version}`}
                 onRemove={() => setRemoveTarget({ kind: "workflow", id: w.id })}
               />
@@ -209,8 +209,8 @@ export function RuntimeAgentsPage() {
               <Row
                 key={a.id}
                 icon={Bot}
-                title={a.id}
-                meta={`${a.model}${a.workflow ? ` · ${a.workflow}` : ""}`}
+                title={a.name}
+                meta={`${a.id} · ${a.model}${a.workflow ? ` · ${a.workflow}` : ""}`}
                 badges={
                   isMissionAgent(a) ? (
                     <Badge variant="primary">mission</Badge>

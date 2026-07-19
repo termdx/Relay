@@ -191,7 +191,11 @@ export const runtime = {
       ),
   },
   workflows: {
-    list: (cwd: string) => rpc<{ id: string; version: string; module?: string }[]>(["workflows", "list"], [cwd]),
+    list: (cwd: string) =>
+      rpc<{ id: string; displayName?: string; version: string; module?: string }[]>(
+        ["workflows", "list"],
+        [cwd],
+      ),
     create: (
       cwd: string,
       input: { id: string; displayName?: string; description?: string; module?: string },
