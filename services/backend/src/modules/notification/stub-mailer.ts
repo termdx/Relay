@@ -7,8 +7,10 @@ export class StubMailer implements Mailer {
   private readonly logger = new Logger(StubMailer.name);
 
   async send(message: MailMessage): Promise<void> {
+    // Full text: sign-in and approval links must be copyable from the logs
+    // when no SMTP server is configured (local dev, demos).
     this.logger.log(
-      `[stub] would send "${message.subject}" to ${message.to}: ${message.text.slice(0, 120)}`,
+      `[stub] would send "${message.subject}" to ${message.to}:\n${message.text}`,
     );
   }
 }

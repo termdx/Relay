@@ -2,6 +2,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -60,24 +61,57 @@ export class PortalAuthService {
       return;
     }
 
-    const token = randomBytes(24).toString('base64url');
-    const portalUrl = this.config.get<string>(
-      'PUBLIC_PORTAL_URL',
-      'http://localhost:5174',
-    );
+    const { token, expiresAt } = this.newLoginToken();
     await this.db.transaction(async (tx) => {
       await tx.insert(portalLoginTokens).values({
         clientId: client.id,
         token,
-        expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+        expiresAt,
       });
       const payload: PortalLoginEmailPayload = {
         clientEmail: client.email,
         clientName: client.name,
-        loginUrl: `${portalUrl}/auth/${token}`,
+        loginUrl: this.loginUrl(token),
       };
       await this.outbox.enqueue(tx, PORTAL_LOGIN_EMAIL, { ...payload });
     });
+  }
+
+  /**
+   * Owner-issued sign-in link: the same single-use, 15-minute token as the
+   * emailed flow, but returned to the owner directly so they can paste it
+   * into whatever channel the client is on — no SMTP dependency.
+   */
+  async issueLoginLink(
+    clientId: string,
+  ): Promise<{ url: string; expiresAt: Date }> {
+    const client = await this.db.query.clients.findFirst({
+      where: eq(clients.id, clientId),
+    });
+    if (!client) throw new NotFoundException('Unknown client.');
+
+    const { token, expiresAt } = this.newLoginToken();
+    await this.db.insert(portalLoginTokens).values({
+      clientId: client.id,
+      token,
+      expiresAt,
+    });
+    return { url: this.loginUrl(token), expiresAt };
+  }
+
+  private newLoginToken(): { token: string; expiresAt: Date } {
+    return {
+      token: randomBytes(24).toString('base64url'),
+      expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+    };
+  }
+
+  private loginUrl(token: string): string {
+    const portalUrl = this.config.get<string>(
+      'PUBLIC_PORTAL_URL',
+      'http://localhost:5174',
+    );
+    return `${portalUrl}/auth/${token}`;
   }
 
   /** Redeem a magic link: single-use, expiring, revocable by deletion. */

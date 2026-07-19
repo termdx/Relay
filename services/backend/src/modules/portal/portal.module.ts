@@ -9,5 +9,6 @@ import { PortalService } from './portal.service';
   imports: [KnowledgeModule],
   controllers: [PortalController],
   providers: [PortalAuthService, PortalGuard, PortalService],
+  exports: [PortalAuthService],
 })
 export class PortalModule {}
