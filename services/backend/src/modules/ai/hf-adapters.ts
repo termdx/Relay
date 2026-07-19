@@ -3,10 +3,20 @@ import type { DraftGenerator, DraftResult } from './draft-generator';
 import { EMBEDDING_DIMENSIONS, type Embedder } from './embedder';
 import { HfClient } from './hf-client';
 
-/** Hugging Face DraftGenerator — same seam as Gemini/stub. */
+/**
+ * Any OpenAI-compatible prompt-in/JSON-out chat client (HF router,
+ * OpenRouter). The draft/answer adapters only need this surface, so they
+ * serve every such provider unchanged.
+ */
+export interface ChatJsonClient {
+  chat(model: string, prompt: string, temperature?: number): Promise<string>;
+  parseJson<T>(raw: string): T;
+}
+
+/** OpenAI-compatible DraftGenerator — same seam as Gemini/stub. */
 export class HfDraftGenerator implements DraftGenerator {
   constructor(
-    private readonly client: HfClient,
+    private readonly client: ChatJsonClient,
     private readonly model: string,
   ) {}
 
@@ -43,10 +53,10 @@ ${transcript}`,
   }
 }
 
-/** Hugging Face Answerer — grounded Q&A, same contract as Gemini/stub. */
+/** OpenAI-compatible Answerer — grounded Q&A, same contract as Gemini/stub. */
 export class HfAnswerer implements Answerer {
   constructor(
-    private readonly client: HfClient,
+    private readonly client: ChatJsonClient,
     private readonly model: string,
   ) {}
 

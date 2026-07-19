@@ -163,16 +163,20 @@ export class AgentExecutorService implements OnModuleInit {
     const aiProvider = this.config
       .get<string>('AI_PROVIDER', 'stub')
       .toLowerCase();
-    if (aiProvider === 'huggingface') {
+    // Agents run on Gemini's native function calling. The active provider
+    // (OpenRouter/HF) may serve chat & drafts, but as long as a Gemini key
+    // is installed, agents keep working.
+    const hasGeminiKey = Boolean(this.config.get<string>('GEMINI_API_KEY'));
+    if (!hasGeminiKey && (aiProvider === 'huggingface' || aiProvider === 'openrouter')) {
       // Honest failure beats a silent stub: agent runs need reliable
-      // function calling, which the HF adapters don't provide yet.
+      // function calling, which the chat-only adapters don't provide.
       throw new Error(
-        'Agent runs currently require the Gemini provider (function calling). ' +
-          'Hugging Face powers drafts, chat, and embeddings — add a Gemini provider to run agents.',
+        'Agent runs currently require a Gemini provider (function calling). ' +
+          `${aiProvider === 'openrouter' ? 'OpenRouter' : 'Hugging Face'} powers drafts and chat — add a Gemini provider to run agents.`,
       );
     }
     // Offline path: prove the plumbing without a model — one retrieval, done.
-    if (aiProvider !== 'gemini') {
+    if (aiProvider !== 'gemini' && !hasGeminiKey) {
       const search = this.tools.find('search_knowledge');
       let found = 'knowledge tool unavailable';
       if (search && available.some((t) => t.name === 'search_knowledge')) {

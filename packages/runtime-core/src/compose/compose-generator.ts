@@ -63,6 +63,14 @@ export function aiProviderEnv(
         // Must be 768-dim to match the knowledge base's pgvector column.
         HF_EMBED_MODEL: 'sentence-transformers/all-mpnet-base-v2',
       };
+    case 'openrouter':
+      return {
+        AI_PROVIDER: 'openrouter',
+        OPENROUTER_API_KEY: apiKey ?? '',
+        // A capable free-tier default; any openrouter.ai model id works.
+        OPENROUTER_MODEL:
+          provider.defaultModel ?? 'meta-llama/llama-3.3-70b-instruct:free',
+      };
     case 'ollama':
       return {
         AI_PROVIDER: 'ollama',

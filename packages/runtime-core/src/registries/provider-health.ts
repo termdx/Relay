@@ -53,6 +53,23 @@ export async function probeProvider(
           .filter((n): n is string => Boolean(n));
         return { id: manifest.id, status: 'ok', models };
       }
+      case 'openrouter': {
+        if (!apiKey) {
+          return { id: manifest.id, status: 'error', detail: 'no API key configured' };
+        }
+        const res = await fetch('https://openrouter.ai/api/v1/models', {
+          headers: { authorization: `Bearer ${apiKey}` },
+        });
+        if (!res.ok) {
+          return { id: manifest.id, status: 'error', detail: `HTTP ${res.status} — key rejected` };
+        }
+        const data = (await res.json()) as { data?: { id?: string }[] };
+        const models = (data.data ?? [])
+          .map((m) => m.id)
+          .filter((n): n is string => Boolean(n))
+          .sort();
+        return { id: manifest.id, status: 'ok', models };
+      }
       case 'huggingface': {
         if (!apiKey) {
           return { id: manifest.id, status: 'error', detail: 'no API key configured' };

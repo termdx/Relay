@@ -261,9 +261,18 @@ export class RuntimeEngine {
         randomBytes(32).toString('base64url'),
       );
     }
+    // Every installed provider contributes its env; the active provider's
+    // block wins last so AI_PROVIDER points at it. This keeps e.g. Gemini's
+    // key present while OpenRouter is active — embeddings and agents still
+    // need it even when chat/drafts route elsewhere.
     const provider = defaultProvider(providers);
+    const aiEnv: Record<string, string> = {};
+    for (const p of providers) {
+      if (p.id === provider?.id) continue;
+      Object.assign(aiEnv, aiProviderEnv(p, await this.ai.resolveApiKey(p)));
+    }
     const apiKey = provider ? await this.ai.resolveApiKey(provider) : undefined;
-    const aiEnv = aiProviderEnv(provider, apiKey);
+    Object.assign(aiEnv, aiProviderEnv(provider, apiKey));
     Object.assign(env, aiEnv);
 
     // Installed integrations: resolve each credential secret into an env var

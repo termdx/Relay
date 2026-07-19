@@ -25,6 +25,8 @@ export interface AddAiProviderInput {
 const DEFAULT_CAPABILITIES: Record<string, string[]> = {
   gemini: ['draft', 'chat', 'embeddings'],
   huggingface: ['draft', 'chat', 'embeddings'],
+  // OpenRouter has no embeddings endpoint — pair it with Gemini/HF for those.
+  openrouter: ['draft', 'chat'],
 };
 
 /**
