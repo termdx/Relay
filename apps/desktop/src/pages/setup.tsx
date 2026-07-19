@@ -1,5 +1,4 @@
 import * as React from "react";
-import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api/http";
 import { useAuth } from "@/lib/auth";
@@ -20,15 +20,29 @@ export function SetupForm() {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [confirm, setConfirm] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const mismatch = confirm.length > 0 && confirm !== password;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (password !== confirm) {
+      setError("Passwords don’t match.");
+      return;
+    }
     setBusy(true);
+    setError(null);
     try {
       await register(email, name, password);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not create account");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not create account — try again.",
+      );
+    } finally {
       setBusy(false);
     }
   }
@@ -50,6 +64,8 @@ export function SetupForm() {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="Ada Lovelace"
+              autoComplete="name"
               required
               autoFocus
             />
@@ -61,22 +77,50 @@ export function SetupForm() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@agency.com"
+              autoComplete="email"
               required
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="password">Password</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={8}
+              autoComplete="new-password"
               required
             />
-            <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+            <p className="text-xs text-muted-foreground">
+              At least 8 characters. There’s no reset flow on a self-hosted
+              instance — store it somewhere safe.
+            </p>
           </div>
-          <Button type="submit" disabled={busy} className="mt-1">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="confirm">Confirm password</Label>
+            <PasswordInput
+              id="confirm"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              minLength={8}
+              autoComplete="new-password"
+              aria-invalid={mismatch}
+              aria-describedby={mismatch ? "confirm-mismatch" : undefined}
+              required
+            />
+            {mismatch && (
+              <p id="confirm-mismatch" className="text-xs text-destructive">
+                Passwords don’t match.
+              </p>
+            )}
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={busy || mismatch} className="mt-1">
             {busy && <Spinner className="size-4" />}
             Create account
           </Button>

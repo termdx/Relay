@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
-  ArrowLeft,
   Bot,
   Check,
   CircleUser,
@@ -9,6 +8,7 @@ import {
   ExternalLink,
   Eye,
   Gavel,
+  ListTodo,
   Plug,
   Plus,
   Sparkles,
@@ -19,12 +19,17 @@ import * as React from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState, ErrorState, LoadingState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { openExternal } from "@/lib/open";
 import { cn } from "@/lib/utils";
 import type {
@@ -66,6 +71,18 @@ const EVENT_LABELS: Record<string, string> = {
   "bitbucket.pr_declined": "PR declined",
 };
 
+function eventLabel(type: string): string {
+  // Unknown types: "acme.thing_happened" → "Thing happened".
+  return (
+    EVENT_LABELS[type] ??
+    type
+      .split(".")
+      .pop()!
+      .replace(/_/g, " ")
+      .replace(/^\w/, (c) => c.toUpperCase())
+  );
+}
+
 function actorIcon(actor: TimelineActor) {
   switch (actor.kind) {
     case "ai":
@@ -88,7 +105,7 @@ function actorLabel(actor: TimelineActor): string {
     case "ai":
       return "Relay AI";
     case "integration":
-      return actor.id;
+      return actor.id.replace(/^\w/, (c) => c.toUpperCase());
     case "system":
       return "System";
   }
@@ -101,30 +118,40 @@ export function ProjectDetailPage() {
     queryFn: () => backend.projects.get(id),
     enabled: Boolean(id),
   });
-  const timeline = useQuery({
-    queryKey: ["projects", id, "timeline"],
-    queryFn: () => backend.projects.timeline(id),
-    enabled: Boolean(id),
-  });
 
   if (project.isLoading) {
     return (
-      <div className="flex justify-center py-16 text-muted-foreground">
-        <Spinner className="size-5" />
-      </div>
+      <>
+        <PageHeader
+          title="Project"
+          breadcrumb={[{ label: "Clients", to: "/clients" }, { label: "…" }]}
+        />
+        <div className="px-8 py-6" aria-hidden="true">
+          <Skeleton className="mb-6 h-4 w-80" />
+          <Skeleton className="h-9 w-72" />
+          <Skeleton className="mt-6 h-40 w-full" />
+        </div>
+      </>
     );
   }
   if (project.isError || !project.data) {
     return (
-      <div className="px-8 py-6">
-        <p className="text-sm text-destructive">Couldn’t load this project.</p>
-        <Button variant="outline" asChild className="mt-4">
-          <Link to="/clients">
-            <ArrowLeft className="size-4" />
-            Back to clients
-          </Link>
-        </Button>
-      </div>
+      <>
+        <PageHeader
+          title="Project"
+          breadcrumb={[
+            { label: "Clients", to: "/clients" },
+            { label: "Not found" },
+          ]}
+        />
+        <div className="px-8 py-6">
+          <ErrorState
+            title="Couldn't load this project"
+            description="It may have been deleted, or the backend is unreachable."
+            onRetry={() => project.refetch()}
+          />
+        </div>
+      </>
     );
   }
 
@@ -134,14 +161,11 @@ export function ProjectDetailPage() {
       <PageHeader
         title={p.name}
         description={`${p.client.name}${p.githubRepo ? ` · ${p.githubRepo}` : ""}`}
-        actions={
-          <Button variant="outline" asChild>
-            <Link to={`/clients/${p.clientId}`}>
-              <ArrowLeft className="size-4" />
-              {p.client.name}
-            </Link>
-          </Button>
-        }
+        breadcrumb={[
+          { label: "Clients", to: "/clients" },
+          { label: p.client.name, to: `/clients/${p.clientId}` },
+          { label: p.name },
+        ]}
       />
 
       <div className="px-8 py-6">
@@ -151,44 +175,41 @@ export function ProjectDetailPage() {
           </p>
         ) : null}
 
-        <AskSection projectId={p.id} />
+        <Tabs defaultValue="work">
+          <TabsList>
+            <TabsTrigger value="work">
+              <ListTodo />
+              Work
+            </TabsTrigger>
+            <TabsTrigger value="activity">
+              <Activity />
+              Activity
+            </TabsTrigger>
+            <TabsTrigger value="settings">
+              <Eye />
+              Portal & ingest
+            </TabsTrigger>
+          </TabsList>
 
-        <PortalSettingsCard project={p} />
-
-        <IngestCard projectId={p.id} />
-
-        <div className="mb-8 grid gap-8 lg:grid-cols-2">
-          <TodosSection projectId={p.id} />
-          <DecisionsSection projectId={p.id} />
-        </div>
-
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Timeline
-        </h2>
-        {timeline.isLoading ? (
-          <div className="flex justify-center py-12 text-muted-foreground">
-            <Spinner className="size-5" />
-          </div>
-        ) : timeline.data && timeline.data.length > 0 ? (
-          <ol className="relative ml-3 border-l border-border">
-            {timeline.data.map((event) => (
-              <TimelineRow key={event.id} event={event} />
-            ))}
-          </ol>
-        ) : (
-          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-12 text-center">
-            <div className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-              <Activity className="size-5" />
+          <TabsContent value="work">
+            <AskSection projectId={p.id} />
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <TodosSection projectId={p.id} />
+              <DecisionsSection projectId={p.id} />
             </div>
-            <div>
-              <p className="font-medium">Nothing tracked yet</p>
-              <p className="text-sm text-muted-foreground">
-                Create a meeting on this project and its whole lifecycle shows
-                up here.
-              </p>
+          </TabsContent>
+
+          <TabsContent value="activity">
+            <TimelineSection projectId={p.id} />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <PortalSettingsCard project={p} />
+              <IngestCard projectId={p.id} />
             </div>
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );
@@ -198,12 +219,13 @@ function AskSection({ projectId }: { projectId: string }) {
   const [question, setQuestion] = React.useState("");
   const ask = useMutation({
     mutationFn: (q: string) => backend.projects.ask(projectId, q),
+    onSuccess: () => setQuestion(""),
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "Ask failed"),
   });
 
   return (
-    <section className="mb-8 rounded-lg border border-border bg-card p-4">
+    <section className="rounded-lg border border-border bg-card p-5">
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         <Sparkles className="size-4 text-primary" />
         Ask Relay
@@ -219,13 +241,20 @@ function AskSection({ projectId }: { projectId: string }) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="What shipped this week? Why did we choose X? When is the demo?"
+          aria-label="Ask Relay a question about this project"
         />
-        <Button type="submit" disabled={ask.isPending} aria-label="Ask">
+        <Button type="submit" disabled={ask.isPending || !question.trim()}>
           {ask.isPending ? <Spinner className="size-4" /> : "Ask"}
         </Button>
       </form>
 
-      {ask.data ? (
+      {ask.isPending ? (
+        <div className="mt-4 space-y-2" aria-hidden="true">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+      ) : ask.data ? (
         <div className="mt-4 flex flex-col gap-3">
           <p className="whitespace-pre-wrap text-sm leading-relaxed">
             {ask.data.answer}
@@ -242,7 +271,9 @@ function AskSection({ projectId }: { projectId: string }) {
                     <span className="shrink-0 font-mono text-primary">
                       [{s.ref}]
                     </span>
-                    <span className="min-w-0 truncate">{s.snippet}</span>
+                    <span className="min-w-0 truncate" title={s.snippet}>
+                      {s.snippet}
+                    </span>
                   </div>
                 ))}
             </div>
@@ -255,6 +286,7 @@ function AskSection({ projectId }: { projectId: string }) {
 
 /** The per-project transcript webhook — the zero-paste meeting intake. */
 function IngestCard({ projectId }: { projectId: string }) {
+  const [copied, setCopied] = React.useState(false);
   const ingest = useQuery({
     queryKey: ["projects", projectId, "ingest-url"],
     queryFn: () => backend.projects.ingestUrl(projectId),
@@ -263,11 +295,12 @@ function IngestCard({ projectId }: { projectId: string }) {
   async function copy() {
     if (!ingest.data?.url) return;
     await navigator.clipboard.writeText(ingest.data.url);
-    toast.success("Ingest URL copied");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   }
 
   return (
-    <section className="mb-8 rounded-lg border border-border bg-card p-4">
+    <section className="h-fit rounded-lg border border-border bg-card p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         <Webhook className="size-4" />
         Transcript ingest
@@ -277,18 +310,42 @@ function IngestCard({ projectId }: { projectId: string }) {
         URL — POST {"{"}"title", "transcript"{"}"} and Relay drafts the meeting,
         emails the client for approval, and files the tasks automatically.
       </p>
-      {ingest.data?.url ? (
+      {ingest.isLoading ? (
+        <Skeleton className="mt-3 h-9 w-full" />
+      ) : ingest.isError ? (
+        <p className="mt-3 text-xs text-destructive">
+          Couldn’t load the ingest URL —{" "}
+          <button
+            type="button"
+            className="underline underline-offset-2"
+            onClick={() => ingest.refetch()}
+          >
+            retry
+          </button>
+          .
+        </p>
+      ) : ingest.data?.url ? (
         <div className="mt-3 flex items-center gap-2">
-          <code className="min-w-0 flex-1 truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs">
+          <code
+            className="min-w-0 flex-1 truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs"
+            title={ingest.data.url}
+          >
             {ingest.data.url}
           </code>
-          <Button variant="outline" size="sm" onClick={() => void copy()}>
-            <Copy className="size-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void copy()}
+            aria-label="Copy ingest URL"
+          >
+            {copied ? (
+              <Check className="size-4 text-success" />
+            ) : (
+              <Copy className="size-4" />
+            )}
             Copy
           </Button>
         </div>
-      ) : ingest.isLoading ? (
-        <Spinner className="mt-3 size-4" />
       ) : (
         <p className="mt-3 text-xs text-warning">
           No ingest secret yet — run `relay up` once.
@@ -331,8 +388,15 @@ function PortalSettingsCard({ project }: { project: ProjectWithClient }) {
   const update = useMutation({
     mutationFn: (patch: Partial<PortalSettings>) =>
       backend.projects.update(project.id, { portalSettings: patch }),
-    onSuccess: () => {
+    onSuccess: (_data, patch) => {
       queryClient.invalidateQueries({ queryKey: ["projects", project.id] });
+      const changed = PORTAL_TOGGLES.find((t) => t.key in patch);
+      if (changed) {
+        const on = patch[changed.key];
+        toast.success(
+          `${changed.label} ${on ? "visible" : "hidden"} on the client portal`,
+        );
+      }
     },
     onError: (err) =>
       toast.error(
@@ -341,39 +405,52 @@ function PortalSettingsCard({ project }: { project: ProjectWithClient }) {
   });
 
   return (
-    <section className="mb-8 rounded-lg border border-border bg-card p-4">
+    <section className="h-fit rounded-lg border border-border bg-card p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         <Eye className="size-4" />
         Client portal
-        <span className="ml-auto text-[11px] font-normal normal-case tracking-normal">
-          what {project.client.name} sees — approvals are always on
-        </span>
       </h2>
-      <div className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        What {project.client.name} sees — approvals are always on.
+      </p>
+      <div className="mt-3 flex flex-col gap-1">
         {PORTAL_TOGGLES.map((toggle) => {
           const on = effective[toggle.key];
           const disabled =
             toggle.key === "feedShowsCode" && !effective.showFeed;
           return (
-            <label
+            <div
               key={toggle.key}
               className={cn(
-                "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/40",
-                disabled && "pointer-events-none opacity-40",
+                "flex items-center gap-3 rounded-md px-2 py-2",
+                !disabled && "hover:bg-accent/40",
               )}
+              title={
+                disabled ? "Turn on the activity feed to use this" : undefined
+              }
             >
-              <input
-                type="checkbox"
+              <Switch
+                id={`portal-${toggle.key}`}
                 checked={on}
                 disabled={update.isPending || disabled}
-                onChange={() => update.mutate({ [toggle.key]: !on })}
-                className="size-4 accent-[var(--primary)]"
+                onCheckedChange={(checked) =>
+                  update.mutate({ [toggle.key]: checked })
+                }
+                aria-label={toggle.label}
               />
-              <span className="text-sm">{toggle.label}</span>
-              <span className="ml-auto text-[11px] text-muted-foreground">
-                {toggle.hint}
-              </span>
-            </label>
+              <label
+                htmlFor={`portal-${toggle.key}`}
+                className={cn(
+                  "flex flex-1 cursor-pointer items-baseline gap-2",
+                  disabled && "cursor-not-allowed opacity-50",
+                )}
+              >
+                <span className="text-sm">{toggle.label}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {toggle.hint}
+                </span>
+              </label>
+            </div>
           );
         })}
       </div>
@@ -398,6 +475,7 @@ function TodosSection({ projectId }: { projectId: string }) {
     mutationFn: () => backend.todos.create(projectId, { title }),
     onSuccess: () => {
       setTitle("");
+      toast.success("Todo added");
       invalidate();
     },
     onError: (err) =>
@@ -407,14 +485,20 @@ function TodosSection({ projectId }: { projectId: string }) {
   const toggle = useMutation({
     mutationFn: (todo: Todo) =>
       backend.todos.setStatus(todo.id, todo.status === "DONE" ? "OPEN" : "DONE"),
-    onSuccess: invalidate,
+    onSuccess: (_data, todo) => {
+      toast.success(
+        todo.status === "DONE" ? "Todo reopened" : "Todo completed",
+      );
+      invalidate();
+    },
     onError: (err) =>
       toast.error(err instanceof ApiError ? err.message : "Could not update todo"),
   });
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <ListTodo className="size-4" />
         Todos
       </h2>
       <form
@@ -428,15 +512,19 @@ function TodosSection({ projectId }: { projectId: string }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Add a todo…"
+          aria-label="New todo title"
         />
-        <Button type="submit" size="icon" disabled={create.isPending} aria-label="Add todo">
+        <Button type="submit" size="icon" disabled={create.isPending || !title.trim()} aria-label="Add todo">
           {create.isPending ? <Spinner className="size-4" /> : <Plus className="size-4" />}
         </Button>
       </form>
       {todos.isLoading ? (
-        <div className="flex justify-center py-6 text-muted-foreground">
-          <Spinner className="size-4" />
-        </div>
+        <TodoListSkeleton />
+      ) : todos.isError ? (
+        <InlineError
+          message="Couldn't load todos"
+          onRetry={() => todos.refetch()}
+        />
       ) : todos.data && todos.data.length > 0 ? (
         <ul className="flex flex-col gap-1.5">
           {todos.data.map((todo) => (
@@ -450,6 +538,7 @@ function TodosSection({ projectId }: { projectId: string }) {
                 aria-label={todo.status === "DONE" ? "Reopen todo" : "Complete todo"}
                 className={cn(
                   "grid size-4.5 shrink-0 place-items-center rounded border transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   todo.status === "DONE"
                     ? "border-transparent bg-primary text-primary-foreground"
                     : "border-border hover:border-primary",
@@ -462,6 +551,7 @@ function TodosSection({ projectId }: { projectId: string }) {
                   "min-w-0 flex-1 truncate text-sm",
                   todo.status === "DONE" && "text-muted-foreground line-through",
                 )}
+                title={todo.title}
               >
                 {todo.title}
               </span>
@@ -474,7 +564,7 @@ function TodosSection({ projectId }: { projectId: string }) {
                 <button
                   type="button"
                   onClick={() => void openExternal(todo.externalUrl!)}
-                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  className="shrink-0 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label="Open linked issue"
                 >
                   <ExternalLink className="size-3.5" />
@@ -504,6 +594,7 @@ function DecisionsSection({ projectId }: { projectId: string }) {
     mutationFn: () => backend.decisions.create(projectId, { title }),
     onSuccess: () => {
       setTitle("");
+      toast.success("Decision recorded");
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "decisions"] });
       queryClient.invalidateQueries({ queryKey: ["projects", projectId, "timeline"] });
     },
@@ -515,7 +606,8 @@ function DecisionsSection({ projectId }: { projectId: string }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <Gavel className="size-4" />
         Decisions
       </h2>
       <form
@@ -529,20 +621,24 @@ function DecisionsSection({ projectId }: { projectId: string }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Record a decision…"
+          aria-label="New decision title"
         />
         <Button
           type="submit"
           size="icon"
-          disabled={create.isPending}
+          disabled={create.isPending || !title.trim()}
           aria-label="Record decision"
         >
           {create.isPending ? <Spinner className="size-4" /> : <Gavel className="size-4" />}
         </Button>
       </form>
       {decisions.isLoading ? (
-        <div className="flex justify-center py-6 text-muted-foreground">
-          <Spinner className="size-4" />
-        </div>
+        <TodoListSkeleton />
+      ) : decisions.isError ? (
+        <InlineError
+          message="Couldn't load decisions"
+          onRetry={() => decisions.refetch()}
+        />
       ) : decisions.data && decisions.data.length > 0 ? (
         <ul className="flex flex-col gap-1.5">
           {decisions.data.map((decision) => (
@@ -552,11 +648,14 @@ function DecisionsSection({ projectId }: { projectId: string }) {
             >
               <div className="flex items-center gap-2">
                 <Gavel className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate text-sm">
+                <span
+                  className="min-w-0 flex-1 truncate text-sm"
+                  title={decision.title}
+                >
                   {decision.title}
                 </span>
                 <time className="shrink-0 text-xs text-muted-foreground">
-                  {new Date(decision.createdAt).toLocaleDateString()}
+                  {formatDate(decision.createdAt)}
                 </time>
               </div>
               {decision.detail ? (
@@ -576,9 +675,46 @@ function DecisionsSection({ projectId }: { projectId: string }) {
   );
 }
 
+function TimelineSection({ projectId }: { projectId: string }) {
+  const timeline = useQuery({
+    queryKey: ["projects", projectId, "timeline"],
+    queryFn: () => backend.projects.timeline(projectId),
+  });
+
+  if (timeline.isLoading) return <LoadingState label="Loading activity…" />;
+  if (timeline.isError) {
+    return (
+      <ErrorState
+        title="Couldn't load the timeline"
+        onRetry={() => timeline.refetch()}
+      />
+    );
+  }
+  if (!timeline.data || timeline.data.length === 0) {
+    return (
+      <EmptyState
+        icon={Activity}
+        title="Nothing tracked yet"
+        description="Create a meeting on this project and its whole lifecycle shows up here."
+        action={
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/meetings/new">New meeting</Link>
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <ol className="relative ml-3 border-l border-border">
+      {timeline.data.map((event) => (
+        <TimelineRow key={event.id} event={event} />
+      ))}
+    </ol>
+  );
+}
+
 function TimelineRow({ event }: { event: TimelineEvent }) {
   const Icon = actorIcon(event.actor);
-  const label = EVENT_LABELS[event.type] ?? event.type;
   const title =
     typeof event.payload.title === "string" ? event.payload.title : null;
   const comment =
@@ -586,11 +722,11 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
 
   return (
     <li className="relative pb-6 pl-6 last:pb-0">
-      <span className="absolute -left-[13px] grid size-6 place-items-center rounded-full border border-border bg-card">
+      <span className="absolute -left-3 grid size-6 place-items-center rounded-full border border-border bg-card">
         <Icon className="size-3.5 text-muted-foreground" />
       </span>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm font-medium">{label}</span>
+        <span className="text-sm font-medium">{eventLabel(event.type)}</span>
         {title ? (
           <span className="text-sm text-muted-foreground">— {title}</span>
         ) : null}
@@ -602,8 +738,39 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
         <p className="mt-1 text-sm italic text-muted-foreground">“{comment}”</p>
       ) : null}
       <time className="mt-0.5 block text-xs text-muted-foreground">
-        {new Date(event.occurredAt).toLocaleString()}
+        {formatDateTime(event.occurredAt)}
       </time>
     </li>
+  );
+}
+
+function TodoListSkeleton() {
+  return (
+    <div className="flex flex-col gap-1.5" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} className="h-9 w-full" />
+      ))}
+    </div>
+  );
+}
+
+function InlineError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-destructive">
+      {message} —{" "}
+      <button
+        type="button"
+        className="underline underline-offset-2"
+        onClick={onRetry}
+      >
+        retry
+      </button>
+    </p>
   );
 }

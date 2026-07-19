@@ -3,8 +3,27 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { Spinner } from "@/components/ui/spinner";
 import { getServerConfig, LOCAL_SERVER, setServerConfig } from "@/lib/api/http";
 import { toast } from "@/lib/toast";
+
+/** Accept http(s) URLs; empty means "fall back to the local default". */
+function isValidUrl(value: string): boolean {
+  const v = value.trim();
+  if (!v) return true;
+  try {
+    const url = new URL(v);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** Trailing slashes shouldn't decide whether we're "on the local stack". */
+function normalize(value: string): string {
+  return value.trim().replace(/\/+$/, "");
+}
 
 /**
  * The agency-server connection form. Lives in Settings, and also on the
@@ -16,27 +35,38 @@ export function ServerSettingsCard() {
   const [backendUrlValue, setBackendUrlValue] = React.useState(current.backendUrl);
   const [runtimeUrlValue, setRuntimeUrlValue] = React.useState(current.runtimeUrl);
   const [token, setToken] = React.useState(current.runtimeToken);
-  const isLocal =
-    backendUrlValue === LOCAL_SERVER.backendUrl &&
-    runtimeUrlValue === LOCAL_SERVER.runtimeUrl;
+  const [saving, setSaving] = React.useState(false);
 
-  function save() {
+  const isLocal =
+    normalize(backendUrlValue) === normalize(LOCAL_SERVER.backendUrl) &&
+    normalize(runtimeUrlValue) === normalize(LOCAL_SERVER.runtimeUrl);
+
+  const urlsValid = isValidUrl(backendUrlValue) && isValidUrl(runtimeUrlValue);
+  const dirty =
+    backendUrlValue !== current.backendUrl ||
+    runtimeUrlValue !== current.runtimeUrl ||
+    token !== current.runtimeToken;
+
+  function reconnect(message: string) {
+    setSaving(true);
+    toast.success(message);
+    setTimeout(() => window.location.reload(), 800);
+  }
+
+  function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!urlsValid || !dirty || saving) return;
     setServerConfig({
       backendUrl: backendUrlValue.trim() || LOCAL_SERVER.backendUrl,
       runtimeUrl: runtimeUrlValue.trim() || LOCAL_SERVER.runtimeUrl,
       runtimeToken: token.trim(),
     });
-    toast.success("Server saved — reloading to reconnect");
-    setTimeout(() => window.location.reload(), 800);
+    reconnect("Server saved — reloading to reconnect");
   }
 
   function resetLocal() {
-    setBackendUrlValue(LOCAL_SERVER.backendUrl);
-    setRuntimeUrlValue(LOCAL_SERVER.runtimeUrl);
-    setToken("");
     setServerConfig(LOCAL_SERVER);
-    toast.success("Back to the local stack — reloading");
-    setTimeout(() => window.location.reload(), 800);
+    reconnect("Back to the local stack — reloading");
   }
 
   return (
@@ -52,7 +82,7 @@ export function ServerSettingsCard() {
         Point at a hosted Relay (e.g. https://relay.youragency.com/api) to work
         against the agency's shared stack.
       </p>
-      <div className="flex flex-col gap-4">
+      <form onSubmit={save} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="srv-backend">Backend URL</Label>
           <Input
@@ -61,7 +91,14 @@ export function ServerSettingsCard() {
             onChange={(e) => setBackendUrlValue(e.target.value)}
             placeholder="https://relay.youragency.com/api"
             className="font-mono text-xs"
+            aria-invalid={!isValidUrl(backendUrlValue)}
+            aria-describedby={!isValidUrl(backendUrlValue) ? "srv-backend-error" : undefined}
           />
+          {!isValidUrl(backendUrlValue) && (
+            <p id="srv-backend-error" className="text-xs text-destructive">
+              Needs to be a full http(s) URL — or leave empty for the local default.
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
@@ -72,13 +109,19 @@ export function ServerSettingsCard() {
               onChange={(e) => setRuntimeUrlValue(e.target.value)}
               placeholder="https://relay.youragency.com/runtime"
               className="font-mono text-xs"
+              aria-invalid={!isValidUrl(runtimeUrlValue)}
+              aria-describedby={!isValidUrl(runtimeUrlValue) ? "srv-runtime-error" : undefined}
             />
+            {!isValidUrl(runtimeUrlValue) && (
+              <p id="srv-runtime-error" className="text-xs text-destructive">
+                Needs to be a full http(s) URL.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="srv-token">Runtime token</Label>
-            <Input
+            <PasswordInput
               id="srv-token"
-              type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="from the server installer"
@@ -87,17 +130,22 @@ export function ServerSettingsCard() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={save}>
-            <Save className="size-4" />
+          <Button type="submit" disabled={!urlsValid || !dirty || saving}>
+            {saving ? <Spinner className="size-4" /> : <Save className="size-4" />}
             Save & reconnect
           </Button>
           {!isLocal && (
-            <Button variant="outline" onClick={resetLocal}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetLocal}
+              disabled={saving}
+            >
               Use local stack
             </Button>
           )}
         </div>
-      </div>
+      </form>
     </section>
   );
 }

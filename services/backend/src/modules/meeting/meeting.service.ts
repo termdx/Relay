@@ -211,6 +211,23 @@ export class MeetingService {
   }
 
   /**
+   * Rebuild the magic link for a meeting awaiting the client, so the founder
+   * can copy/re-send it after leaving the review screen. null when the
+   * meeting isn't pending (or the approval record is gone).
+   */
+  async getApprovalLink(id: string): Promise<{ approvalUrl: string | null }> {
+    const meeting = await this.findOne(id);
+    if (meeting.status !== 'PENDING_APPROVAL') return { approvalUrl: null };
+    const approval = await this.approvals.findPendingForMeeting(meeting.id);
+    if (!approval) return { approvalUrl: null };
+    const baseUrl = this.config.get<string>(
+      'PUBLIC_BASE_URL',
+      'http://localhost:3000',
+    );
+    return { approvalUrl: `${baseUrl}/approve/${approval.token}` };
+  }
+
+  /**
    * Apply a client's decision. Delivered by the transactional outbox with
    * retry — so this method is IDEMPOTENT: a repeat delivery after a partial
    * failure finishes the remaining work instead of redoing it. Tasks that

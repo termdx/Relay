@@ -9,6 +9,8 @@ interface RuntimeWorkspaceValue {
   /** Selected workspace root (defaults to the daemon's, overridable by the switcher). */
   root: string | null;
   setRoot: (root: string) => void;
+  /** Re-check daemon health on demand (the query also polls every 5 s). */
+  retry: () => void;
 }
 
 const Ctx = React.createContext<RuntimeWorkspaceValue | null>(null);
@@ -38,6 +40,7 @@ export function RuntimeWorkspaceProvider({
         isLoading: health.isLoading,
         root: selected,
         setRoot: setSelected,
+        retry: () => void health.refetch(),
       }}
     >
       {children}

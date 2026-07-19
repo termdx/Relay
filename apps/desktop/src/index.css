@@ -37,6 +37,44 @@
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 }
 
+/* Motion tokens. Entrances use an ease-out curve, exits a quick ease-in;
+   Radix keeps closing elements mounted until animationend. */
+@theme {
+  --animate-overlay-show: overlay-show 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-overlay-hide: overlay-hide 120ms ease-in;
+  --animate-dialog-show: dialog-show 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-dialog-hide: dialog-hide 130ms ease-in;
+  --animate-popover-show: popover-show 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-popover-hide: popover-hide 100ms ease-in;
+
+  @keyframes overlay-show {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes overlay-hide {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  /* translate is a separate CSS property in Tailwind v4, so animating
+     transform here composes with the centering translate utilities. */
+  @keyframes dialog-show {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes dialog-hide {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.97); }
+  }
+  @keyframes popover-show {
+    from { opacity: 0; transform: scale(0.98) translateY(-3px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes popover-hide {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.98); }
+  }
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(0.99 0.005 310);
@@ -100,4 +138,57 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+  /*
+   * Tailwind v4's preflight dropped cursor:pointer on buttons (v3 had it).
+   * Every enabled interactive element should read as clickable.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not(:disabled):not([aria-disabled="true"]),
+  [role="switch"]:not(:disabled):not([aria-disabled="true"]),
+  label[for],
+  select:not(:disabled),
+  summary,
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/*
+ * Slim, theme-aware scrollbars. The WKWebView default is a chunky opaque
+ * gutter (especially glaring in light mode); this keeps a narrow overlay
+ * thumb that follows the theme in every scroll container.
+ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

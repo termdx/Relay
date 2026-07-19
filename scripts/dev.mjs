@@ -47,6 +47,7 @@ const C = {
 };
 const log = (color, tag, msg) => console.log(`${color}[${tag}]${C.reset} ${msg}`);
 const silent = (cmd) => { try { execSync(cmd, { stdio: "ignore" }); return true; } catch { return false; } };
+const silentOut = (cmd) => { try { return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; } };
 const loud = (cmd, env) =>
   execSync(cmd, { stdio: "inherit", env: { ...process.env, ...env } });
 
@@ -108,6 +109,16 @@ async function waitForHealth(label, color) {
 }
 
 function startDaemon() {
+  // The installed Relay.app runs a bundled sidecar daemon on the same port —
+  // its GUI-launched env has no working docker, so everything downstream
+  // fails with confusing compose errors. Refuse to share the port.
+  const squatter = silentOut("lsof -tiTCP:51720 -sTCP:LISTEN");
+  if (squatter) {
+    const cmd = silentOut(`ps -o comm= -p ${squatter.split("\n")[0]}`);
+    log(C.err, "runtime", `port 51720 is already in use by: ${cmd || "unknown process"}`);
+    log(C.err, "runtime", "quit the installed Relay app (or that process) and re-run pnpm dev.");
+    process.exit(1);
+  }
   log(C.rt, "runtime", "starting daemon (:51720)…");
   spawnBg(C.rt, "runtime", CLI_TSX, [CLI, "daemon", "start"], {});
 }

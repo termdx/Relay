@@ -3,7 +3,9 @@ import { Plus, Users } from "lucide-react";
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/lib/toast";
+import { ClickableRow } from "@/components/clickable-row";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,13 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
 
 export function ClientsPage() {
-  const navigate = useNavigate();
   const clients = useQuery({
     queryKey: ["clients"],
     queryFn: backend.clients.list,
@@ -38,13 +40,13 @@ export function ClientsPage() {
 
       <div className="px-8 py-6">
         {clients.isLoading ? (
-          <div className="flex justify-center py-16 text-muted-foreground">
-            <Spinner className="size-5" />
-          </div>
+          <ClientTableSkeleton />
         ) : clients.isError ? (
-          <p className="text-sm text-destructive">
-            Couldn’t load clients. Is the backend running?
-          </p>
+          <ErrorState
+            title="Couldn't load clients"
+            description="Is the backend running?"
+            onRetry={() => clients.refetch()}
+          />
         ) : clients.data && clients.data.length > 0 ? (
           <div className="overflow-hidden rounded-lg border border-border">
             <table className="w-full text-sm">
@@ -58,10 +60,10 @@ export function ClientsPage() {
               </thead>
               <tbody>
                 {clients.data.map((c) => (
-                  <tr
+                  <ClickableRow
                     key={c.id}
-                    onClick={() => navigate(`/clients/${c.id}`)}
-                    className="cursor-pointer border-b border-border last:border-0 hover:bg-accent/40"
+                    to={`/clients/${c.id}`}
+                    label={c.name}
                   >
                     <td className="px-4 py-3 font-medium">{c.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">
@@ -71,33 +73,41 @@ export function ClientsPage() {
                     <td className="px-4 py-3 text-muted-foreground">
                       {c.projects.length}
                     </td>
-                  </tr>
+                  </ClickableRow>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <EmptyState />
+          <EmptyState
+            icon={Users}
+            title="No clients yet"
+            description="Add your first client — projects, meetings, and the timeline all attach to one."
+            action={<NewClientDialog />}
+          />
         )}
       </div>
     </>
   );
 }
 
-function EmptyState() {
+function ClientTableSkeleton() {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-16 text-center">
-      <div className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-        <Users className="size-5" />
-      </div>
-      <div>
-        <p className="font-medium">No clients yet</p>
-        <p className="text-sm text-muted-foreground">
-          Add your first client — projects, meetings, and the timeline all
-          attach to one.
-        </p>
-      </div>
-      <NewClientDialog />
+    <div
+      aria-hidden="true"
+      className="overflow-hidden rounded-lg border border-border"
+    >
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0"
+        >
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="ml-auto h-4 w-6" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -110,6 +120,16 @@ function NewClientDialog() {
   const [company, setCompany] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [notes, setNotes] = React.useState("");
+
+  // Fresh form every time the dialog opens.
+  React.useEffect(() => {
+    if (open) {
+      setName("");
+      setCompany("");
+      setEmail("");
+      setNotes("");
+    }
+  }, [open]);
 
   const create = useMutation({
     mutationFn: backend.clients.create,

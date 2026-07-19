@@ -5,6 +5,17 @@
     <link rel="icon" type="image/png" href="/relay-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Relay</title>
+    <script>
+      // Apply the persisted theme before first paint (mirrors lib/theme.tsx).
+      try {
+        var t = localStorage.getItem("relay.theme") || "dark";
+        if (t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (_) {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
   </head>
 
   <body>

@@ -30,6 +30,12 @@ async function ensurePermission(): Promise<boolean> {
   return granted;
 }
 
+/** Ask for OS permission up front (Settings toggle); resolves to granted?. */
+export async function requestNotifyPermission(): Promise<boolean> {
+  if (!("__TAURI_INTERNALS__" in window)) return false;
+  return ensurePermission();
+}
+
 export async function nativeNotify(title: string, body?: string): Promise<void> {
   if (!("__TAURI_INTERNALS__" in window)) return; // web mode: in-app only
   if (!nativeNotificationsEnabled()) return;

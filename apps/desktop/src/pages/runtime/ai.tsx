@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, KeyRound, Plus, Trash2 } from "lucide-react";
+import { Activity, AlertTriangle, Bot, KeyRound, Plus, Trash2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "@/lib/toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SectionHead } from "@/components/section-head";
+import { EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Select,
   SelectContent,
@@ -21,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { runtime, RuntimeError } from "@/lib/api/runtime";
 import { useRuntimeWorkspace } from "@/lib/runtime-workspace";
@@ -55,7 +60,16 @@ export function RuntimeAiPage() {
       />
 
       {providers.isLoading ? (
-        <Spinner className="size-5" />
+        <div className="space-y-2" aria-hidden="true">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </div>
+      ) : providers.isError ? (
+        <ErrorState
+          title="Couldn't load providers"
+          onRetry={() => providers.refetch()}
+        />
       ) : providers.data && providers.data.length > 0 ? (
         <div className="space-y-2">
           {providers.data.map((p) => (
@@ -71,7 +85,17 @@ export function RuntimeAiPage() {
           ))}
         </div>
       ) : (
-        <Empty>No providers yet. Add Gemini, OpenAI, or a local Ollama.</Empty>
+        <EmptyState
+          icon={Bot}
+          title="No providers yet"
+          description="Add Gemini, OpenAI, or a local Ollama — drafts, chat, and agents route through it."
+          action={
+            <Button size="sm" onClick={() => setAdding(true)}>
+              <Plus className="size-4" />
+              Add provider
+            </Button>
+          }
+        />
       )}
 
       <AddProviderDialog
@@ -82,6 +106,12 @@ export function RuntimeAiPage() {
       />
     </div>
   );
+}
+
+interface ProbeResult {
+  status: string;
+  detail?: string;
+  models?: string[];
 }
 
 function ProviderRow({
@@ -99,9 +129,14 @@ function ProviderRow({
   hasApiKey: boolean;
   onRemoved: () => void;
 }) {
+  const [confirmRemove, setConfirmRemove] = React.useState(false);
+  const [probe, setProbe] = React.useState<ProbeResult | null>(null);
+
   const health = useMutation({
     mutationFn: () => runtime.ai.health(cwd, id),
     onSuccess: (h) => {
+      // Persist the result on the row — a toast alone vanishes in 4 s.
+      setProbe(h);
       if (h.status === "ok")
         toast.success(
           `${id}: ok${h.models?.length ? ` — ${h.models.length} models` : ""}`,
@@ -123,16 +158,28 @@ function ProviderRow({
 
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-      <div className="flex items-baseline gap-2">
+      <div className="flex min-w-0 items-baseline gap-2">
         <span className="font-mono text-sm font-medium">{id}</span>
         <span className="text-xs text-muted-foreground">{provider}</span>
         {defaultModel && (
-          <span className="text-xs text-muted-foreground">· {defaultModel}</span>
+          <span className="truncate text-xs text-muted-foreground">
+            · {defaultModel}
+          </span>
         )}
         {hasApiKey && (
           <Badge variant="outline" className="gap-1">
             <KeyRound className="size-3" />
             key
+          </Badge>
+        )}
+        {probe && (
+          <Badge
+            variant={probe.status === "ok" ? "success" : probe.status === "error" ? "destructive" : "warning"}
+            title={probe.detail}
+          >
+            {probe.status === "ok"
+              ? `ok${probe.models?.length ? ` · ${probe.models.length} models` : ""}`
+              : (probe.detail ?? probe.status)}
           </Badge>
         )}
       </div>
@@ -149,13 +196,23 @@ function ProviderRow({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => remove.mutate()}
+          onClick={() => setConfirmRemove(true)}
           disabled={remove.isPending}
           aria-label={`Remove ${id}`}
         >
           <Trash2 className="size-4" />
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        onOpenChange={setConfirmRemove}
+        title={`Remove "${id}"?`}
+        description="Drafts, chat, and agents using this provider stop working until you add another."
+        confirmLabel="Remove provider"
+        destructive
+        onConfirm={() => remove.mutate()}
+      />
     </div>
   );
 }
@@ -197,6 +254,11 @@ function AddProviderDialog({
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Add failed"),
   });
 
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!add.isPending && (!needsKey || apiKey)) add.mutate();
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -208,11 +270,11 @@ function AddProviderDialog({
               : "Local provider — no key leaves your machine."}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4">
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label>Provider</Label>
+            <Label htmlFor="provider">Provider</Label>
             <Select value={provider} onValueChange={setProvider}>
-              <SelectTrigger>
+              <SelectTrigger id="provider">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -227,11 +289,11 @@ function AddProviderDialog({
           {needsKey ? (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="key">API key</Label>
-              <Input
+              <PasswordInput
                 id="key"
-                type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
+                placeholder="From the provider's console"
                 autoFocus
               />
             </div>
@@ -279,49 +341,22 @@ function AddProviderDialog({
             )}
           </div>
           {needsKey && (
-            <p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-[--color-warning]">
-              ⚠ A hosted provider means your data leaves this machine.
+            <p className="flex items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              A hosted provider means your data leaves this machine.
             </p>
           )}
-        </div>
-        <DialogFooter>
-          <Button
-            onClick={() => add.mutate()}
-            disabled={add.isPending || (needsKey && !apiKey)}
-          >
-            {add.isPending ? <Spinner className="size-4" /> : <Plus className="size-4" />}
-            Add provider
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button
+              type="submit"
+              disabled={add.isPending || (needsKey && !apiKey)}
+            >
+              {add.isPending ? <Spinner className="size-4" /> : <Plus className="size-4" />}
+              Add provider
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-export function SectionHead({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string;
-  subtitle: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="mb-5 flex items-start justify-between gap-4">
-      <div>
-        <h2 className="font-semibold">{title}</h2>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-export function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-      {children}
-    </div>
   );
 }

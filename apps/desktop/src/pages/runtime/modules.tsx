@@ -1,17 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Trash2 } from "lucide-react";
+import { Download, PackageOpen, Trash2 } from "lucide-react";
+import * as React from "react";
 import { toast } from "@/lib/toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SectionHead } from "@/components/section-head";
+import { EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { runtime, RuntimeError } from "@/lib/api/runtime";
 import { useRuntimeWorkspace } from "@/lib/runtime-workspace";
-import { Empty, SectionHead } from "./ai";
 
 export function RuntimeModulesPage() {
   const { root } = useRuntimeWorkspace();
   const cwd = root!;
   const queryClient = useQueryClient();
+  // Track WHICH row is busy — one shared isPending would freeze every button.
+  const [pendingId, setPendingId] = React.useState<string | null>(null);
+  const [removeId, setRemoveId] = React.useState<string | null>(null);
 
   const installed = useQuery({
     queryKey: ["modules", cwd],
@@ -29,12 +36,18 @@ export function RuntimeModulesPage() {
 
   const install = useMutation({
     mutationFn: (id: string) => runtime.modules.add(cwd, id, true),
+    onMutate: (id) => setPendingId(id),
+    onSettled: () => setPendingId(null),
     onSuccess: (plan) => {
       toast.success(`Installed: ${plan.order.join(", ")}`);
       if (plan.missingIntegrations.length)
-        toast.warning(`Needs integrations: ${plan.missingIntegrations.join(", ")}`);
+        toast.warning(
+          `Needs integrations: ${plan.missingIntegrations.join(", ")} — connect them on the Integrations tab.`,
+        );
       if (plan.missingAiCapabilities.length)
-        toast.warning(`Needs AI capabilities: ${plan.missingAiCapabilities.join(", ")}`);
+        toast.warning(
+          `Needs AI capabilities: ${plan.missingAiCapabilities.join(", ")} — add a provider on the AI tab.`,
+        );
       invalidate();
     },
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Install failed"),
@@ -42,6 +55,8 @@ export function RuntimeModulesPage() {
 
   const remove = useMutation({
     mutationFn: (id: string) => runtime.modules.remove(cwd, id),
+    onMutate: (id) => setPendingId(id),
+    onSettled: () => setPendingId(null),
     onSuccess: (_r, id) => {
       toast.success(`Removed "${id}"`);
       invalidate();
@@ -64,7 +79,16 @@ export function RuntimeModulesPage() {
           Installed
         </div>
         {installed.isLoading ? (
-          <Spinner className="size-5" />
+          <div className="space-y-2" aria-hidden="true">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-13 w-full" />
+            ))}
+          </div>
+        ) : installed.isError ? (
+          <ErrorState
+            title="Couldn't load installed modules"
+            onRetry={() => installed.refetch()}
+          />
         ) : installed.data && installed.data.length > 0 ? (
           installed.data.map((m) => (
             <div
@@ -83,18 +107,35 @@ export function RuntimeModulesPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => remove.mutate(m.id)}
-                disabled={remove.isPending}
+                onClick={() => setRemoveId(m.id)}
+                disabled={pendingId === m.id}
                 aria-label={`Remove ${m.id}`}
               >
-                <Trash2 className="size-4" />
+                {pendingId === m.id ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
               </Button>
             </div>
           ))
         ) : (
-          <Empty>Nothing installed yet.</Empty>
+          <EmptyState
+            icon={PackageOpen}
+            title="Nothing installed yet"
+            description="Pick modules from the catalog below — dependencies resolve automatically."
+          />
         )}
       </div>
+
+      {catalog.isError && (
+        <div className="mt-6">
+          <ErrorState
+            title="Couldn't load the module catalog"
+            onRetry={() => catalog.refetch()}
+          />
+        </div>
+      )}
 
       {available.length > 0 && (
         <div className="mt-6 space-y-2">
@@ -121,9 +162,9 @@ export function RuntimeModulesPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => install.mutate(m.id)}
-                disabled={install.isPending}
+                disabled={pendingId !== null}
               >
-                {install.isPending ? (
+                {pendingId === m.id ? (
                   <Spinner className="size-4" />
                 ) : (
                   <Download className="size-4" />
@@ -134,6 +175,19 @@ export function RuntimeModulesPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={removeId !== null}
+        onOpenChange={(open) => !open && setRemoveId(null)}
+        title={`Remove "${removeId}"?`}
+        description="Anything the module provided stops working in this workspace. Installed files stay on disk."
+        confirmLabel="Remove module"
+        destructive
+        onConfirm={() => {
+          if (removeId) remove.mutate(removeId);
+          setRemoveId(null);
+        }}
+      />
     </div>
   );
 }

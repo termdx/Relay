@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, FolderPlus, Plus } from "lucide-react";
+import { Check, ChevronDown, FolderPlus, Plus, Server } from "lucide-react";
 import * as React from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { EmptyState, LoadingState } from "@/components/states";
+import { PageHeader } from "@/components/page-header";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -29,62 +38,67 @@ const TABS = [
 ];
 
 export function RuntimeLayout() {
-  const { daemon, isLoading, root } = useRuntimeWorkspace();
+  const { daemon, isLoading, root, retry } = useRuntimeWorkspace();
 
   if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        <Spinner className="size-5" />
-      </div>
-    );
+    return <LoadingState label="Connecting to the runtime daemon…" />;
   }
 
   if (!daemon) {
     return (
-      <div className="p-8">
-        <div className="rounded-lg border border-dashed border-border py-16 text-center">
-          <p className="font-medium">Runtime daemon isn’t running</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Start it with{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-              pnpm --filter @relay/cli relay daemon start
-            </code>
-            . It auto-creates a default workspace.
-          </p>
-        </div>
+      <div className="px-8 py-6">
+        <EmptyState
+          icon={Server}
+          title="Runtime daemon isn't running"
+          description={
+            <>
+              Start it with{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                pnpm --filter @relay/cli relay daemon start
+              </code>
+              . This page checks again every 5 seconds.
+            </>
+          }
+          action={
+            <Button variant="outline" size="sm" onClick={retry}>
+              Check again
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-4 border-b border-border px-8 pt-5">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Runtime</h1>
-          <WorkspaceSwitcher />
-        </div>
-      </div>
-      <nav className="flex gap-1 border-b border-border px-6">
-        {TABS.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.end}
-            className={({ isActive }) =>
-              cn(
-                "border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )
-            }
-          >
-            {tab.label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="flex-1 overflow-y-auto p-8">
-        {root ? <Outlet /> : <Spinner className="size-5" />}
+      <PageHeader
+        title="Runtime"
+        description={<WorkspaceSwitcher />}
+        tabs={
+          <nav aria-label="Runtime sections" className="-mb-px -ml-3 flex gap-1">
+            {TABS.map((tab) => (
+              <NavLink
+                key={tab.to}
+                to={tab.to}
+                end={tab.end}
+                className={({ isActive }) =>
+                  cn(
+                    "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isActive
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )
+                }
+              >
+                {tab.label}
+              </NavLink>
+            ))}
+          </nav>
+        }
+      />
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        {root ? <Outlet /> : <LoadingState label="Loading workspace…" />}
       </div>
     </div>
   );
@@ -92,7 +106,6 @@ export function RuntimeLayout() {
 
 function WorkspaceSwitcher() {
   const { root, setRoot } = useRuntimeWorkspace();
-  const [open, setOpen] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
   const workspaces = useQuery({
     queryKey: ["workspaces"],
@@ -102,57 +115,49 @@ function WorkspaceSwitcher() {
   const current = workspaces.data?.find((w) => w.root === root);
 
   return (
-    <div className="relative mt-0.5">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <span className="font-mono">{current?.name ?? "workspace"}</span>
-        <span className="text-xs opacity-70">{current?.organization}</span>
-        <ChevronDown className="size-3.5" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-7 z-20 w-64 rounded-md border border-border bg-popover p-1 shadow-md">
-            {workspaces.data?.map((w) => (
-              <button
-                key={w.root}
-                onClick={() => {
-                  setRoot(w.root);
-                  setOpen(false);
-                }}
-                className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-              >
-                <span>
-                  <span className="font-mono">{w.name}</span>{" "}
-                  <span className="text-xs text-muted-foreground">
-                    {w.organization}
-                  </span>
-                </span>
-                {w.root === root && <Check className="size-4" />}
-              </button>
-            ))}
-            <div className="my-1 border-t border-border" />
-            <button
-              onClick={() => {
-                setCreating(true);
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="-ml-1 flex items-center gap-1.5 rounded-sm px-1 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="font-mono">{current?.name ?? "workspace"}</span>
+            <span className="text-xs opacity-70">{current?.organization}</span>
+            <ChevronDown className="size-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-64">
+          {workspaces.data?.map((w) => (
+            <DropdownMenuItem
+              key={w.root}
+              onSelect={() => setRoot(w.root)}
+              className="flex items-center justify-between"
             >
-              <FolderPlus className="size-4" />
-              New workspace
-            </button>
-          </div>
-        </>
-      )}
+              <span>
+                <span className="font-mono">{w.name}</span>{" "}
+                <span className="text-xs text-muted-foreground">
+                  {w.organization}
+                </span>
+              </span>
+              {w.root === root && <Check className="size-4 text-primary" />}
+            </DropdownMenuItem>
+          ))}
+          {workspaces.data && workspaces.data.length > 0 && (
+            <DropdownMenuSeparator />
+          )}
+          <DropdownMenuItem onSelect={() => setCreating(true)}>
+            <FolderPlus />
+            New workspace
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <CreateWorkspaceDialog
         open={creating}
         onOpenChange={setCreating}
         onCreated={(root) => setRoot(root)}
       />
-    </div>
+    </>
   );
 }
 
@@ -183,6 +188,11 @@ function CreateWorkspaceDialog({
       toast.error(e instanceof RuntimeError ? e.message : "Could not create workspace"),
   });
 
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (name && !create.isPending) create.mutate();
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -192,7 +202,7 @@ function CreateWorkspaceDialog({
             Created under <code className="font-mono">~/.relay/workspaces</code>.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4">
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="ws-name">Name</Label>
             <Input
@@ -215,16 +225,13 @@ function CreateWorkspaceDialog({
               placeholder="Acme Studio"
             />
           </div>
-        </div>
-        <DialogFooter>
-          <Button
-            onClick={() => create.mutate()}
-            disabled={!name || create.isPending}
-          >
-            {create.isPending ? <Spinner className="size-4" /> : <Plus className="size-4" />}
-            Create
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="submit" disabled={!name || create.isPending}>
+              {create.isPending ? <Spinner className="size-4" /> : <Plus className="size-4" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

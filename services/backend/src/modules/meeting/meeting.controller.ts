@@ -31,6 +31,13 @@ export class MeetingController {
     return this.meetings.findOne(id);
   }
 
+  @Get(':id/approval-link')
+  getApprovalLink(
+    @Param('id') id: string,
+  ): Promise<{ approvalUrl: string | null }> {
+    return this.meetings.getApprovalLink(id);
+  }
+
   @Patch(':id/draft')
   updateDraft(
     @Param('id') id: string,

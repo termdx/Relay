@@ -18,6 +18,16 @@ export interface AddAiProviderInput {
 }
 
 /**
+ * What each known provider's backend adapters actually support. Modules
+ * validate their requiredAiCapabilities against these, so an understated
+ * list produces false MISSING_AI_CAPABILITY diagnostics.
+ */
+const DEFAULT_CAPABILITIES: Record<string, string[]> = {
+  gemini: ['draft', 'chat', 'embeddings'],
+  huggingface: ['draft', 'chat', 'embeddings'],
+};
+
+/**
  * Manages installed AI providers (ai/<id>.yaml). Generalizes the hand-wired
  * AI_PROVIDER/GEMINI_API_KEY seam in services/backend into managed state:
  * the key lands in secrets, the config in a manifest holding only a secret ref.
@@ -40,7 +50,7 @@ export class AiProviderRegistry {
       apiKeyRef,
       models: input.models ?? [],
       defaultModel: input.defaultModel,
-      capabilities: input.capabilities ?? ['draft'],
+      capabilities: input.capabilities ?? DEFAULT_CAPABILITIES[input.provider] ?? ['draft'],
     });
 
     // Write the secret first so a manifest never references a missing secret.

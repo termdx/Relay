@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
+  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
   {
     variants: {
       variant: {
@@ -11,11 +11,11 @@ const badgeVariants = cva(
         primary:
           "border-transparent bg-primary/15 text-primary [.dark_&]:bg-primary/20",
         success:
-          "border-transparent bg-[--color-success]/15 text-[--color-success]",
+          "border-transparent bg-success/15 text-success [.dark_&]:bg-success/20",
         warning:
-          "border-transparent bg-[--color-warning]/15 text-[--color-warning]",
+          "border-transparent bg-warning/15 text-warning [.dark_&]:bg-warning/20",
         destructive:
-          "border-transparent bg-destructive/15 text-destructive",
+          "border-transparent bg-destructive/15 text-destructive [.dark_&]:bg-destructive/20",
         outline: "text-foreground",
       },
     },

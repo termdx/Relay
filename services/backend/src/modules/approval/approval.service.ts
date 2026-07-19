@@ -54,6 +54,17 @@ export class ApprovalService {
     return approval;
   }
 
+  /** Latest still-pending approval for a meeting, if one exists. */
+  async findPendingForMeeting(meetingId: string): Promise<Approval | undefined> {
+    return this.db.query.approvals.findFirst({
+      where: and(
+        eq(approvals.meetingId, meetingId),
+        eq(approvals.status, 'PENDING'),
+      ),
+      orderBy: (a, { desc }) => [desc(a.createdAt)],
+    });
+  }
+
   /**
    * Record a client's decision. A second response to an already-decided
    * approval is rejected rather than silently overwritten — enforced in the

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Sparkles, Upload } from "lucide-react";
+import { Sparkles, Upload } from "lucide-react";
 import * as React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/lib/toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +20,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
 
+const MAX_TRANSCRIPT_FILE = 2 * 1024 * 1024; // 2 MB of plain text is a LOT of meeting.
+
 export function NewMeetingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const fileInput = React.useRef<HTMLInputElement>(null);
   const [projectId, setProjectId] = React.useState("");
   const [title, setTitle] = React.useState("");
   const [clientEmail, setClientEmail] = React.useState("");
   const [githubRepo, setGithubRepo] = React.useState("");
   const [transcript, setTranscript] = React.useState("");
+  const [confirmLeave, setConfirmLeave] = React.useState(false);
+
+  const started = Boolean(title || transcript || clientEmail || githubRepo);
 
   const projects = useQuery({
     queryKey: ["projects"],
@@ -45,14 +52,24 @@ export function NewMeetingPage() {
 
   const create = useMutation({
     mutationFn: backend.meetings.create,
+    onMutate: () => {
+      toast.loading("Generating draft — this can take a few seconds…", {
+        id: "generate-draft",
+      });
+    },
     onSuccess: (meeting) => {
+      toast.dismiss("generate-draft");
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Draft generated");
       navigate(`/meetings/${meeting.id}`);
     },
-    onError: (err) =>
-      toast.error(err instanceof ApiError ? err.message : "Could not create meeting"),
+    onError: (err) => {
+      toast.dismiss("generate-draft");
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not create meeting",
+      );
+    },
   });
 
   function onSubmit(e: React.FormEvent) {
@@ -66,32 +83,44 @@ export function NewMeetingPage() {
     });
   }
 
+  function importTranscript(file: File) {
+    if (file.size > MAX_TRANSCRIPT_FILE) {
+      toast.error("That file is over 2 MB — paste the relevant part instead.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setTranscript(String(reader.result ?? ""));
+    reader.readAsText(file);
+  }
+
   return (
     <>
       <PageHeader
         title="New meeting"
         description="Relay drafts a client-ready summary and proposed tasks from the transcript."
-        actions={
-          <Button variant="outline" asChild>
-            <Link to="/meetings">
-              <ArrowLeft className="size-4" />
-              Back
-            </Link>
-          </Button>
-        }
+        breadcrumb={[
+          {
+            label: "Meetings",
+            to: "/meetings",
+            onClick: started ? () => setConfirmLeave(true) : undefined,
+          },
+          { label: "New meeting" },
+        ]}
       />
 
       <form onSubmit={onSubmit} className="mx-auto max-w-2xl px-8 py-6">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <Label>Project</Label>
+            <Label htmlFor="project">Project</Label>
             <Select value={projectId} onValueChange={onSelectProject}>
-              <SelectTrigger>
+              <SelectTrigger id="project">
                 <SelectValue
                   placeholder={
-                    projects.data && projects.data.length === 0
-                      ? "No projects yet — meeting won’t appear on a timeline"
-                      : "Attribute to a project (recommended)"
+                    projects.isLoading
+                      ? "Loading projects…"
+                      : projects.data && projects.data.length === 0
+                        ? "No projects yet — meeting won’t appear on a timeline"
+                        : "Attribute to a project (recommended)"
                   }
                 />
               </SelectTrigger>
@@ -103,9 +132,23 @@ export function NewMeetingPage() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Fills the project timeline and prefills client + repo.
-            </p>
+            {projects.isError ? (
+              <p className="text-xs text-destructive">
+                Couldn’t load projects —{" "}
+                <button
+                  type="button"
+                  className="underline underline-offset-2 hover:text-destructive/80"
+                  onClick={() => projects.refetch()}
+                >
+                  retry
+                </button>
+                . You can still create the meeting unattributed.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Fills the project timeline and prefills client + repo.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -139,35 +182,40 @@ export function NewMeetingPage() {
               id="repo"
               value={githubRepo}
               onChange={(e) => setGithubRepo(e.target.value)}
-              placeholder="owner/repo"
+              placeholder="acme/website"
               pattern="[^/\s]+/[^/\s]+"
+              aria-describedby="repo-hint"
               required
             />
-            <p className="text-xs text-muted-foreground">
-              Approved tasks are pushed here as issues.
+            <p id="repo-hint" className="text-xs text-muted-foreground">
+              Format: owner/repo. Approved tasks are pushed here as issues.
             </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="transcript">Transcript</Label>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto px-2 py-1 text-xs text-muted-foreground"
+                onClick={() => fileInput.current?.click()}
+              >
                 <Upload className="size-3.5" />
                 Import file
-                <input
-                  type="file"
-                  accept=".txt,.md,.vtt,.srt,text/plain"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () =>
-                      setTranscript(String(reader.result ?? ""));
-                    reader.readAsText(file);
-                  }}
-                />
-              </label>
+              </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".txt,.md,.vtt,.srt,text/plain"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) importTranscript(file);
+                  e.target.value = "";
+                }}
+              />
             </div>
             <Textarea
               id="transcript"
@@ -191,6 +239,16 @@ export function NewMeetingPage() {
           </div>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={confirmLeave}
+        onOpenChange={setConfirmLeave}
+        title="Discard this meeting?"
+        description="The title, transcript, and details you've entered will be lost."
+        confirmLabel="Discard and leave"
+        destructive
+        onConfirm={() => navigate("/meetings")}
+      />
     </>
   );
 }

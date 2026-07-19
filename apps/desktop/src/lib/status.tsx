@@ -1,5 +1,5 @@
 import type { BadgeProps } from "@/components/ui/badge";
-import type { MeetingStatus } from "@/lib/api/types";
+import type { MeetingStatus, ProjectStatus } from "@/lib/api/types";
 
 interface StatusMeta {
   label: string;
@@ -15,6 +15,16 @@ const MEETING_STATUS: Record<MeetingStatus, StatusMeta> = {
 
 export function meetingStatusMeta(status: MeetingStatus): StatusMeta {
   return MEETING_STATUS[status];
+}
+
+const PROJECT_STATUS: Record<ProjectStatus, StatusMeta> = {
+  ACTIVE: { label: "Active", variant: "success" },
+  PAUSED: { label: "Paused", variant: "warning" },
+  COMPLETED: { label: "Completed", variant: "outline" },
+};
+
+export function projectStatusMeta(status: ProjectStatus): StatusMeta {
+  return PROJECT_STATUS[status];
 }
 
 /** Can the founder still edit / send this meeting's draft? */

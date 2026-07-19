@@ -15,7 +15,13 @@ import {
 import * as React from "react";
 import { toast } from "@/lib/toast";
 import { appUnfocused, nativeNotify } from "@/lib/notify";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { IntegrationIcon } from "@/components/integration-icon";
+import { SectionHead } from "@/components/section-head";
+import { EmptyState, ErrorState } from "@/components/states";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { backend } from "@/lib/api/backend";
@@ -40,7 +47,7 @@ import { ApiError } from "@/lib/api/http";
 import { runtime, RuntimeError } from "@/lib/api/runtime";
 import type { AgentRun } from "@/lib/api/types";
 import { useRuntimeWorkspace } from "@/lib/runtime-workspace";
-import { Empty, SectionHead } from "./ai";
+import { cn } from "@/lib/utils";
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 
@@ -52,6 +59,9 @@ export function RuntimeAgentsPage() {
   const [newAgent, setNewAgent] = React.useState(false);
   const [editing, setEditing] = React.useState<AgentListItem | null>(null);
   const [running, setRunning] = React.useState<AgentListItem | null>(null);
+  const [removeTarget, setRemoveTarget] = React.useState<
+    { kind: "workflow" | "agent"; id: string } | null
+  >(null);
   const [watching, setWatching] = React.useState<
     { agent: AgentListItem; runs: { projectId: string; runId: string }[] }[]
   >([]);
@@ -66,9 +76,15 @@ export function RuntimeAgentsPage() {
     const bound = (agent.projects ?? []).filter((id) =>
       (projectsQuery.data ?? []).some((p) => p.id === id),
     );
+    const lost = (agent.projects?.length ?? 0) - bound.length;
     if (bound.length === 0) {
       toast.error("None of this agent's projects exist anymore — edit it.");
       return;
+    }
+    if (lost > 0) {
+      toast.warning(
+        `${lost} bound project${lost > 1 ? "s" : ""} no longer exist${lost > 1 ? "" : "s"} — running on the remaining ${bound.length}.`,
+      );
     }
     toast.loading(`${agent.name} is working…`, {
       id: `agent-${agent.id}`,
@@ -110,14 +126,23 @@ export function RuntimeAgentsPage() {
 
   const removeWorkflow = useMutation({
     mutationFn: (id: string) => runtime.workflows.remove(cwd, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workflows", cwd] }),
+    onSuccess: (_r, id) => {
+      toast.success(`Removed workflow "${id}"`);
+      queryClient.invalidateQueries({ queryKey: ["workflows", cwd] });
+    },
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Remove failed"),
   });
   const removeAgent = useMutation({
     mutationFn: (id: string) => runtime.agents.remove(cwd, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agents", cwd] }),
+    onSuccess: (_r, id) => {
+      toast.success(`Removed agent "${id}"`);
+      queryClient.invalidateQueries({ queryKey: ["agents", cwd] });
+    },
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Remove failed"),
   });
+
+  const isMissionAgent = (a: AgentListItem) =>
+    Boolean(a.mission) && (a.projects?.length ?? 0) > 0;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -133,7 +158,12 @@ export function RuntimeAgentsPage() {
           }
         />
         {workflows.isLoading ? (
-          <Spinner className="size-5" />
+          <RowSkeletons />
+        ) : workflows.isError ? (
+          <ErrorState
+            title="Couldn't load workflows"
+            onRetry={() => workflows.refetch()}
+          />
         ) : workflows.data && workflows.data.length > 0 ? (
           <div className="space-y-2">
             {workflows.data.map((w) => (
@@ -142,19 +172,23 @@ export function RuntimeAgentsPage() {
                 icon={Workflow}
                 title={w.id}
                 meta={w.module ? `module: ${w.module}` : `v${w.version}`}
-                onRemove={() => removeWorkflow.mutate(w.id)}
+                onRemove={() => setRemoveTarget({ kind: "workflow", id: w.id })}
               />
             ))}
           </div>
         ) : (
-          <Empty>No workflows yet.</Empty>
+          <EmptyState
+            icon={Workflow}
+            title="No workflows yet"
+            description="Scaffold one — you get a manifest and starter code to build on."
+          />
         )}
       </div>
 
       <div>
         <SectionHead
           title="Agents"
-          subtitle="Agents. Scaffolds a manifest + starter code."
+          subtitle="Mission-driven workers that run across your projects on demand."
           action={
             <Button variant="outline" onClick={() => setNewAgent(true)}>
               <Plus className="size-4" />
@@ -163,7 +197,12 @@ export function RuntimeAgentsPage() {
           }
         />
         {agents.isLoading ? (
-          <Spinner className="size-5" />
+          <RowSkeletons />
+        ) : agents.isError ? (
+          <ErrorState
+            title="Couldn't load agents"
+            onRetry={() => agents.refetch()}
+          />
         ) : agents.data && agents.data.length > 0 ? (
           <div className="space-y-2">
             {agents.data.map((a) => (
@@ -172,18 +211,32 @@ export function RuntimeAgentsPage() {
                 icon={Bot}
                 title={a.id}
                 meta={`${a.model}${a.workflow ? ` · ${a.workflow}` : ""}`}
-                onRemove={() => removeAgent.mutate(a.id)}
+                badges={
+                  isMissionAgent(a) ? (
+                    <Badge variant="primary">mission</Badge>
+                  ) : undefined
+                }
+                runDisabled={watching.some((w) => w.agent.id === a.id)}
+                onRemove={() => setRemoveTarget({ kind: "agent", id: a.id })}
                 onRun={() =>
-                  a.mission && (a.projects?.length ?? 0) > 0
-                    ? void startMissionRuns(a)
-                    : setRunning(a)
+                  isMissionAgent(a) ? void startMissionRuns(a) : setRunning(a)
                 }
                 onEdit={() => setEditing(a)}
               />
             ))}
           </div>
         ) : (
-          <Empty>No agents yet.</Empty>
+          <EmptyState
+            icon={Bot}
+            title="No agents yet"
+            description="Create one with a mission and projects — then fire it with a single Run."
+            action={
+              <Button size="sm" variant="outline" onClick={() => setNewAgent(true)}>
+                <Plus className="size-4" />
+                New agent
+              </Button>
+            }
+          />
         )}
       </div>
 
@@ -225,6 +278,35 @@ export function RuntimeAgentsPage() {
           }
         />
       ))}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title={`Remove ${removeTarget?.kind} "${removeTarget?.id}"?`}
+        description={
+          removeTarget?.kind === "agent"
+            ? "Its mission and project bindings are deleted. Run history is kept."
+            : "The workflow manifest is removed from this workspace."
+        }
+        confirmLabel={`Remove ${removeTarget?.kind ?? ""}`}
+        destructive
+        onConfirm={() => {
+          if (!removeTarget) return;
+          if (removeTarget.kind === "workflow") removeWorkflow.mutate(removeTarget.id);
+          else removeAgent.mutate(removeTarget.id);
+          setRemoveTarget(null);
+        }}
+      />
+    </div>
+  );
+}
+
+function RowSkeletons() {
+  return (
+    <div className="space-y-2" aria-hidden="true">
+      {[0, 1].map((i) => (
+        <Skeleton key={i} className="h-13 w-full" />
+      ))}
     </div>
   );
 }
@@ -243,6 +325,8 @@ function Row({
   icon: Icon,
   title,
   meta,
+  badges,
+  runDisabled,
   onRemove,
   onRun,
   onEdit,
@@ -250,20 +334,29 @@ function Row({
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   meta: string;
+  badges?: React.ReactNode;
+  runDisabled?: boolean;
   onRemove: () => void;
   onRun?: () => void;
   onEdit?: () => void;
 }) {
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-2.5">
-        <Icon className="size-4 text-muted-foreground" />
-        <span className="font-mono text-sm font-medium">{title}</span>
-        <span className="text-xs text-muted-foreground">{meta}</span>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Icon className="size-4 shrink-0 text-muted-foreground" />
+        <span className="truncate font-mono text-sm font-medium">{title}</span>
+        <span className="truncate text-xs text-muted-foreground">{meta}</span>
+        {badges}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         {onRun && (
-          <Button variant="ghost" size="sm" onClick={onRun}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRun}
+            disabled={runDisabled}
+            title={runDisabled ? "Already running" : undefined}
+          >
             <Play className="size-4" />
             Run
           </Button>
@@ -280,6 +373,9 @@ function Row({
     </div>
   );
 }
+
+/** Stop polling after ~2 minutes of consecutive API failures. */
+const MAX_WATCH_FAILURES = 40;
 
 /**
  * Headless watcher: polls the agent's runs, keeps the top-center loading
@@ -298,6 +394,7 @@ function AgentRunWatcher({
   onSettled: () => void;
 }) {
   const announced = React.useRef(false);
+  const failures = React.useRef(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -310,6 +407,7 @@ function AgentRunWatcher({
           runs.map((r) => backend.agentRuns.get(r.runId)),
         );
         if (cancelled) return;
+        failures.current = 0;
         const settled = results.every(
           (r) => r.status === "DONE" || r.status === "FAILED",
         );
@@ -329,12 +427,12 @@ function AgentRunWatcher({
         if (!announced.current) {
           announced.current = true;
           toast.dismiss(toastId);
-          const failures = results.filter((r) => r.status === "FAILED").length;
+          const failed = results.filter((r) => r.status === "FAILED").length;
           if (appUnfocused()) {
             void nativeNotify(
-              failures === 0
+              failed === 0
                 ? `${agent.name} did its work`
-                : `${agent.name} finished with ${failures} failure(s)`,
+                : `${agent.name} finished with ${failed} failure(s)`,
               results
                 .map((r) => (r.output ?? r.error ?? "").slice(0, 120))
                 .join(" · ")
@@ -358,7 +456,16 @@ function AgentRunWatcher({
           onSettled();
         }
       } catch {
-        if (!cancelled) setTimeout(() => void tick(), 3000);
+        if (cancelled) return;
+        failures.current += 1;
+        if (failures.current >= MAX_WATCH_FAILURES) {
+          toast.error(`${agent.name}: lost contact with the backend — check the run history.`, {
+            id: `agent-${agent.id}`,
+          });
+          onSettled();
+          return;
+        }
+        setTimeout(() => void tick(), 3000);
       }
     };
     void tick();
@@ -410,17 +517,20 @@ function AgentDoneToast({
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-label={expanded ? "Collapse report" : "Expand report"}
-          className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ChevronDown
-            className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+            className={cn(
+              "size-4 transition-transform",
+              expanded && "rotate-180",
+            )}
           />
         </button>
         <button
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="size-4" />
         </button>
@@ -501,6 +611,11 @@ function ManualRunDialog({
   const result = run.data;
   const finished = result?.status === "DONE" || result?.status === "FAILED";
 
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!start.isPending && projectId && instruction.trim()) start.mutate();
+  }
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg">
@@ -513,11 +628,11 @@ function ManualRunDialog({
         </DialogHeader>
 
         {!runId ? (
-          <div className="flex flex-col gap-4">
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label>Project</Label>
+              <Label htmlFor="run-project">Project</Label>
               <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger>
+                <SelectTrigger id="run-project">
                   <SelectValue placeholder="Pick a project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -541,18 +656,18 @@ function ManualRunDialog({
             </div>
             <DialogFooter>
               <Button
-                onClick={() => start.mutate()}
+                type="submit"
                 disabled={start.isPending || !projectId || !instruction.trim()}
               >
                 {start.isPending ? <Spinner className="size-4" /> : <Play className="size-4" />}
                 Run agent
               </Button>
             </DialogFooter>
-          </div>
+          </form>
         ) : (
           <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
             {!finished && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Spinner className="size-4" />
                 {result?.status === "RUNNING" ? "Working…" : "Queued…"}
               </div>
@@ -619,6 +734,11 @@ function NewWorkflowDialog({
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Failed"),
   });
 
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (slug(name) && !create.isPending) create.mutate();
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -626,36 +746,59 @@ function NewWorkflowDialog({
           <DialogTitle>New workflow</DialogTitle>
           <DialogDescription>Creates workflows/&lt;id&gt;.yaml + a scaffold.</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="wf-name">Name</Label>
-          <Input
-            id="wf-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Meeting processing"
-            autoFocus
-          />
-          {name && (
-            <p className="text-xs text-muted-foreground">
-              id: <span className="font-mono">{slug(name)}</span>
-            </p>
-          )}
-        </div>
-        <DialogFooter>
-          <Button onClick={() => create.mutate()} disabled={!slug(name) || create.isPending}>
-            {create.isPending && <Spinner className="size-4" />}
-            Create
-          </Button>
-        </DialogFooter>
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="wf-name">Name</Label>
+            <Input
+              id="wf-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Meeting processing"
+              autoFocus
+            />
+            {name && (
+              <p className="text-xs text-muted-foreground">
+                id: <span className="font-mono">{slug(name)}</span>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={!slug(name) || create.isPending}>
+              {create.isPending && <Spinner className="size-4" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
 }
 
-const INTEGRATION_TOOLS: { tool: string; label: string; hint: string }[] = [
-  { tool: "publish_issue", label: "Repo access", hint: "issues in/out + CI status" },
-  { tool: "notify_team", label: "Team chat", hint: "post to Slack / Discord" },
-  { tool: "email_owner", label: "Email", hint: "send you reports (never clients)" },
+const INTEGRATION_TOOLS: {
+  tool: string;
+  label: string;
+  hint: string;
+  /** Provider marks shown next to the label. */
+  icons: string[];
+}[] = [
+  {
+    tool: "publish_issue",
+    label: "Repo access",
+    hint: "issues in/out + CI status",
+    icons: ["github", "gitlab", "bitbucket"],
+  },
+  {
+    tool: "notify_team",
+    label: "Team chat",
+    hint: "post to Slack / Discord",
+    icons: ["slack", "discord"],
+  },
+  {
+    tool: "email_owner",
+    label: "Email",
+    hint: "send you reports (never clients)",
+    icons: ["smtp"],
+  },
 ];
 
 function AgentDialog({
@@ -759,9 +902,20 @@ function AgentDialog({
   const toggle = (list: string[], value: string) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
+  const canSubmit =
+    Boolean(slug(name)) &&
+    Boolean(model) &&
+    Boolean(mission.trim()) &&
+    projectIds.length > 0;
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (canSubmit && !create.isPending) create.mutate();
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{editing ? `Edit ${editing.id}` : "New agent"}</DialogTitle>
           <DialogDescription>
@@ -769,123 +923,119 @@ function AgentDialog({
             mission with zero further input.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ag-name">Name</Label>
-              <Input
-                id="ag-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Weekly reviewer"
-                autoFocus
-              />
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="ag-name">Name</Label>
+                <Input
+                  id="ag-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Weekly reviewer"
+                  autoFocus
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="ag-model">Model</Label>
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger id="ag-model" className="font-mono text-xs">
+                    <SelectValue placeholder="Pick a model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {options.map((option) => (
+                      <SelectItem key={option} value={option} className="font-mono text-xs">
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Gemini only — agents need function calling. Other providers
+                  power drafts, chat &amp; embeddings.
+                </p>
+              </div>
             </div>
+
             <div className="flex flex-col gap-1.5">
-              <Label>Model</Label>
-              <Select value={model} onValueChange={setModel}>
-                <SelectTrigger className="font-mono text-xs">
-                  <SelectValue placeholder="Pick a model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.map((option) => (
-                    <SelectItem key={option} value={option} className="font-mono text-xs">
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                Gemini only — agents need function calling. Other providers
-                power drafts, chat &amp; embeddings.
+              <Label htmlFor="ag-mission">Mission</Label>
+              <Textarea
+                id="ag-mission"
+                value={mission}
+                onChange={(e) => setMission(e.target.value)}
+                placeholder="Review recent activity, summarize progress, create todos for anything dropped, and notify the team."
+                className="min-h-20"
+              />
+              <p className="text-xs text-muted-foreground">
+                The standing instruction every run executes.
               </p>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ag-mission">Mission</Label>
-            <Textarea
-              id="ag-mission"
-              value={mission}
-              onChange={(e) => setMission(e.target.value)}
-              placeholder="Review recent activity, summarize progress, create todos for anything dropped, and notify the team."
-              className="min-h-20"
-            />
-            <p className="text-xs text-muted-foreground">
-              The standing instruction every run executes.
-            </p>
-          </div>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="text-sm font-medium leading-none">Projects</legend>
+              {projects.data && projects.data.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                  {projects.data.map((p) => (
+                    <label
+                      key={p.id}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/40"
+                    >
+                      <Checkbox
+                        checked={projectIds.includes(p.id)}
+                        onCheckedChange={() => setProjectIds((l) => toggle(l, p.id))}
+                      />
+                      <span className="text-sm">
+                        {p.client.name} — {p.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No projects yet — create one under Clients first.
+                </p>
+              )}
+            </fieldset>
 
-          <div className="flex flex-col gap-1.5">
-            <Label>Projects</Label>
-            {projects.data && projects.data.length > 0 ? (
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="text-sm font-medium leading-none">
+                Integrations the agent may use
+              </legend>
               <div className="flex flex-col gap-1">
-                {projects.data.map((p) => (
+                {INTEGRATION_TOOLS.map((integration) => (
                   <label
-                    key={p.id}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/40"
+                    key={integration.tool}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-accent/40"
                   >
-                    <input
-                      type="checkbox"
-                      checked={projectIds.includes(p.id)}
-                      onChange={() => setProjectIds((l) => toggle(l, p.id))}
-                      className="size-4 accent-[var(--primary)]"
+                    <Checkbox
+                      checked={tools.includes(integration.tool)}
+                      onCheckedChange={() => setTools((l) => toggle(l, integration.tool))}
                     />
-                    <span className="text-sm">
-                      {p.client.name} — {p.name}
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      {integration.icons.map((id) => (
+                        <IntegrationIcon key={id} id={id} className="size-3.5" />
+                      ))}
+                    </span>
+                    <span className="text-sm">{integration.label}</span>
+                    <span className="ml-auto text-[11px] text-muted-foreground">
+                      {integration.hint}
                     </span>
                   </label>
                 ))}
               </div>
-            ) : (
               <p className="text-xs text-muted-foreground">
-                No projects yet — create one under Clients first.
+                Project data (knowledge, todos, decisions, timeline) is always
+                available. These grant real outside reach.
               </p>
-            )}
+            </fieldset>
           </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>Integrations the agent may use</Label>
-            <div className="flex flex-col gap-1">
-              {INTEGRATION_TOOLS.map((integration) => (
-                <label
-                  key={integration.tool}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/40"
-                >
-                  <input
-                    type="checkbox"
-                    checked={tools.includes(integration.tool)}
-                    onChange={() => setTools((l) => toggle(l, integration.tool))}
-                    className="size-4 accent-[var(--primary)]"
-                  />
-                  <span className="text-sm">{integration.label}</span>
-                  <span className="ml-auto text-[11px] text-muted-foreground">
-                    {integration.hint}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Project data (knowledge, todos, decisions, timeline) is always
-              available. These grant real outside reach.
-            </p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            onClick={() => create.mutate()}
-            disabled={
-              !slug(name) ||
-              !model ||
-              !mission.trim() ||
-              projectIds.length === 0 ||
-              create.isPending
-            }
-          >
-            {create.isPending && <Spinner className="size-4" />}
-            {editing ? "Save changes" : "Create agent"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="submit" disabled={!canSubmit || create.isPending}>
+              {create.isPending && <Spinner className="size-4" />}
+              {editing ? "Save changes" : "Create agent"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -9,8 +9,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (status === "loading") {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-muted-foreground">
-        <Spinner className="size-6" />
+      <div
+        role="status"
+        className="flex h-screen flex-col items-center justify-center gap-4 bg-background text-muted-foreground"
+      >
+        <img src="/relay-logo.png" alt="" className="size-10" />
+        <div className="flex items-center gap-2.5 text-sm">
+          <Spinner className="size-4" />
+          Restoring your session…
+        </div>
       </div>
     );
   }

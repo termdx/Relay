@@ -1,5 +1,4 @@
 import * as React from "react";
-import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api/http";
 import { useAuth } from "@/lib/auth";
@@ -19,14 +19,20 @@ export function LoginForm() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    setError(null);
     try {
       await login(email, password);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not sign in");
+      // Inline, not just a toast — toasts render top-center, far from this card.
+      setError(
+        err instanceof ApiError ? err.message : "Could not sign in — try again.",
+      );
+    } finally {
       setBusy(false);
     }
   }
@@ -46,20 +52,28 @@ export function LoginForm() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@agency.com"
+              autoComplete="email"
               required
               autoFocus
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="password">Password</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
               required
             />
           </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
           <Button type="submit" disabled={busy} className="mt-1">
             {busy && <Spinner className="size-4" />}
             Sign in

@@ -3,9 +3,11 @@ import { Palette, Save, Upload, X } from "lucide-react";
 import * as React from "react";
 import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/page-header";
+import { ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
@@ -13,10 +15,25 @@ import { ApiError } from "@/lib/api/http";
 const MAX_LOGO_BYTES = 1_000_000;
 const DEFAULT_ACCENT = "#7c5cff";
 
+/** Pick black or white text for a #rrggbb background (relative luminance). */
+function readableTextColor(hex: string): string {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) return "#ffffff";
+  const n = parseInt(m[1]!, 16);
+  const channels = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const [r, g, b] = channels.map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }) as [number, number, number];
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.35 ? "#1a1a1a" : "#ffffff";
+}
+
 /** What the client portal wears: agency name, logo, accent color. */
 export function BrandingPage() {
   const queryClient = useQueryClient();
   const current = useQuery({ queryKey: ["branding"], queryFn: backend.branding.get });
+  const fileInput = React.useRef<HTMLInputElement>(null);
 
   const [name, setName] = React.useState("");
   const [accent, setAccent] = React.useState(DEFAULT_ACCENT);
@@ -31,6 +48,13 @@ export function BrandingPage() {
       setLoaded(true);
     }
   }, [current.data, loaded]);
+
+  const dirty =
+    loaded &&
+    current.data !== undefined &&
+    (name.trim() !== (current.data.agencyName ?? "") ||
+      accent !== (current.data.accentColor ?? DEFAULT_ACCENT) ||
+      (logo ?? "") !== (current.data.logo ?? ""));
 
   const save = useMutation({
     mutationFn: () =>
@@ -64,11 +88,19 @@ export function BrandingPage() {
         title="Branding"
         description="What your clients see on the portal. Relay stays out of the way."
       />
-      <div className="max-w-xl px-8 py-6">
+      <div className="max-w-2xl px-8 py-6">
         {current.isLoading ? (
-          <div className="flex justify-center py-12 text-muted-foreground">
-            <Spinner className="size-5" />
+          <div className="flex flex-col gap-6" aria-hidden="true">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
           </div>
+        ) : current.isError ? (
+          <ErrorState
+            title="Couldn't load branding"
+            description="Is the backend running?"
+            onRetry={() => current.refetch()}
+          />
         ) : (
           <form
             className="flex flex-col gap-6"
@@ -106,14 +138,19 @@ export function BrandingPage() {
                   onChange={(e) => setAccent(e.target.value)}
                   pattern="#[0-9a-fA-F]{6}"
                   className="max-w-28 font-mono text-xs"
+                  aria-label="Accent color as hex (#rrggbb)"
                 />
                 <span
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-white"
-                  style={{ backgroundColor: accent }}
+                  className="rounded-md px-3 py-1.5 text-xs font-medium"
+                  style={{
+                    backgroundColor: accent,
+                    color: readableTextColor(accent),
+                  }}
                 >
                   Buttons look like this
                 </span>
               </div>
+              <p className="text-xs text-muted-foreground">As hex: #rrggbb.</p>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -130,7 +167,7 @@ export function BrandingPage() {
                       type="button"
                       onClick={() => setLogo(null)}
                       aria-label="Remove logo"
-                      className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground"
+                      className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <X className="size-3" />
                     </button>
@@ -140,16 +177,25 @@ export function BrandingPage() {
                     <Palette className="size-5" />
                   </div>
                 )}
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent/40">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInput.current?.click()}
+                >
                   <Upload className="size-4" />
                   Upload image
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    className="hidden"
-                    onChange={(e) => onLogoFile(e.target.files?.[0])}
-                  />
-                </label>
+                </Button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={(e) => {
+                    onLogoFile(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
               </div>
               <p className="text-xs text-muted-foreground">
                 SVG, PNG, JPEG, or WebP, under 1 MB. Stored inline — no external hosting.
@@ -157,7 +203,7 @@ export function BrandingPage() {
             </div>
 
             <div>
-              <Button type="submit" disabled={save.isPending}>
+              <Button type="submit" disabled={save.isPending || !dirty}>
                 {save.isPending ? <Spinner className="size-4" /> : <Save className="size-4" />}
                 Save branding
               </Button>

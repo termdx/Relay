@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Eye, EyeOff, Plug, Trash2 } from "lucide-react";
+import { Activity, Plug, Trash2 } from "lucide-react";
+import { IntegrationIcon } from "@/components/integration-icon";
 import * as React from "react";
 import { toast } from "@/lib/toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SectionHead } from "@/components/section-head";
+import { EmptyState, ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -20,6 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
   runtime,
@@ -28,13 +34,20 @@ import {
 } from "@/lib/api/runtime";
 import { openExternal } from "@/lib/open";
 import { useRuntimeWorkspace } from "@/lib/runtime-workspace";
-import { Empty, SectionHead } from "./ai";
+
+/** "client_secret" → "Client secret" */
+function friendlyName(raw: string): string {
+  const spaced = raw.replace(/[_-]+/g, " ").trim();
+  return spaced.replace(/^\w/, (c) => c.toUpperCase());
+}
 
 export function RuntimeIntegrationsPage() {
   const { root } = useRuntimeWorkspace();
   const cwd = root!;
   const queryClient = useQueryClient();
   const [adding, setAdding] = React.useState<IntegrationManifest | null>(null);
+  const [healthId, setHealthId] = React.useState<string | null>(null);
+  const [removeId, setRemoveId] = React.useState<string | null>(null);
 
   const installed = useQuery({
     queryKey: ["integrations", cwd],
@@ -48,9 +61,14 @@ export function RuntimeIntegrationsPage() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["integrations", cwd] });
 
+  // Guard against overlapping applies when several changes land in a row.
+  const applying = React.useRef(false);
+
   /** Credentials only reach the backend when the stack regenerates — apply
    * immediately so "connected" always means "working". */
   async function applyToStack() {
+    if (applying.current) return;
+    applying.current = true;
     toast.loading("Applying to the stack…", { id: "stack-apply" });
     try {
       await runtime.stack.up(cwd);
@@ -62,6 +80,8 @@ export function RuntimeIntegrationsPage() {
           : "Connected, but applying failed — run `relay up` manually",
         { id: "stack-apply" },
       );
+    } finally {
+      applying.current = false;
     }
   }
 
@@ -77,6 +97,8 @@ export function RuntimeIntegrationsPage() {
 
   const health = useMutation({
     mutationFn: (id: string) => runtime.integrations.health(cwd, id),
+    onMutate: (id) => setHealthId(id),
+    onSettled: () => setHealthId(null),
     onSuccess: (h) => {
       const bad = h.checks.filter((c) => c.status !== "ok");
       if (bad.length === 0) toast.success(`${h.id}: all checks ok`);
@@ -100,14 +122,24 @@ export function RuntimeIntegrationsPage() {
           Connected
         </div>
         {installed.isLoading ? (
-          <Spinner className="size-5" />
+          <div className="space-y-2" aria-hidden="true">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-13 w-full" />
+            ))}
+          </div>
+        ) : installed.isError ? (
+          <ErrorState
+            title="Couldn't load integrations"
+            onRetry={() => installed.refetch()}
+          />
         ) : installed.data && installed.data.length > 0 ? (
           installed.data.map((i) => (
             <div
               key={i.id}
               className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
             >
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-center gap-2.5">
+                <IntegrationIcon id={i.id} className="text-muted-foreground" />
                 <span className="font-mono text-sm font-medium">{i.id}</span>
                 <span className="text-xs text-muted-foreground">
                   {i.displayName}
@@ -118,15 +150,19 @@ export function RuntimeIntegrationsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => health.mutate(i.id)}
-                  disabled={health.isPending}
+                  disabled={healthId !== null || remove.isPending}
                 >
-                  <Activity className="size-4" />
+                  {healthId === i.id ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <Activity className="size-4" />
+                  )}
                   Health
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => remove.mutate(i.id)}
+                  onClick={() => setRemoveId(i.id)}
                   disabled={remove.isPending}
                   aria-label={`Remove ${i.id}`}
                 >
@@ -136,9 +172,22 @@ export function RuntimeIntegrationsPage() {
             </div>
           ))
         ) : (
-          <Empty>No integrations connected.</Empty>
+          <EmptyState
+            icon={Plug}
+            title="No integrations connected"
+            description="Connect one below — the stack restarts itself so it's live immediately."
+          />
         )}
       </div>
+
+      {catalog.isError && (
+        <div className="mt-6">
+          <ErrorState
+            title="Couldn't load the integration catalog"
+            onRetry={() => catalog.refetch()}
+          />
+        </div>
+      )}
 
       {available.length > 0 && (
         <div className="mt-6 space-y-2">
@@ -151,7 +200,7 @@ export function RuntimeIntegrationsPage() {
               className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
             >
               <div className="flex items-center gap-2">
-                <Plug className="size-4 text-muted-foreground" />
+                <IntegrationIcon id={i.id} className="text-muted-foreground" />
                 <span className="font-mono text-sm">{i.id}</span>
                 <span className="text-xs text-muted-foreground">
                   {i.displayName}
@@ -177,6 +226,19 @@ export function RuntimeIntegrationsPage() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={removeId !== null}
+        onOpenChange={(open) => !open && setRemoveId(null)}
+        title={`Remove "${removeId}"?`}
+        description="Its credentials are deleted and the stack restarts without it. You can reconnect any time."
+        confirmLabel="Remove integration"
+        destructive
+        onConfirm={() => {
+          if (removeId) remove.mutate(removeId);
+          setRemoveId(null);
+        }}
+      />
     </div>
   );
 }
@@ -209,6 +271,11 @@ function ConnectDialog({
     (c) => c.required && !values[c.name],
   );
 
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!connect.isPending && !missingRequired) connect.mutate();
+  }
+
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent>
@@ -228,44 +295,41 @@ function ConnectDialog({
             onUseToken={() => setUseToken(true)}
           />
         ) : (
-          <>
-            <div className="flex flex-col gap-4">
-              {manifest.credentials.map((cred) => (
-                <div key={cred.name} className="flex flex-col gap-1.5">
-                  <Label htmlFor={cred.name}>
-                    {cred.name}
-                    {cred.required && <span className="text-destructive"> *</span>}
-                  </Label>
-                  <Input
-                    id={cred.name}
-                    type="password"
-                    value={values[cred.name] ?? ""}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, [cred.name]: e.target.value }))
-                    }
-                  />
-                </div>
-              ))}
-            </div>
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            {manifest.credentials.map((cred) => (
+              <div key={cred.name} className="flex flex-col gap-1.5">
+                <Label htmlFor={cred.name}>
+                  {friendlyName(cred.name)}
+                  {cred.required && <span className="text-destructive"> *</span>}
+                </Label>
+                <PasswordInput
+                  id={cred.name}
+                  value={values[cred.name] ?? ""}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, [cred.name]: e.target.value }))
+                  }
+                />
+              </div>
+            ))}
             <DialogFooter className="items-center">
               {manifest.id === "github" && (
                 <button
                   type="button"
-                  className="mr-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+                  className="mr-auto rounded-sm text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => setUseToken(false)}
                 >
                   Use GitHub sign-in instead
                 </button>
               )}
               <Button
-                onClick={() => connect.mutate()}
+                type="submit"
                 disabled={connect.isPending || missingRequired}
               >
                 {connect.isPending && <Spinner className="size-4" />}
                 Connect
               </Button>
             </DialogFooter>
-          </>
+          </form>
         )}
       </DialogContent>
     </Dialog>
@@ -351,7 +415,6 @@ function SmtpConnect({
   const [providerId, setProviderId] = React.useState("resend");
   const [user, setUser] = React.useState("");
   const [secret, setSecret] = React.useState("");
-  const [showSecret, setShowSecret] = React.useState(false);
   const [host, setHost] = React.useState("");
   const [port, setPort] = React.useState("587");
   const [from, setFrom] = React.useState("");
@@ -371,7 +434,8 @@ function SmtpConnect({
       });
     },
     onSuccess: () => {
-      toast.success("Email connected — restart the stack to start sending");
+      // onConnected applies the stack restart — no "restart it yourself" copy.
+      toast.success("Email connected");
       onConnected();
     },
     onError: (e) =>
@@ -384,12 +448,17 @@ function SmtpConnect({
     (!provider.fixedUser && !provider.userIsKey && !provider.custom && !user.trim()) ||
     (provider.custom && !user.trim());
 
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!connect.isPending && !missing) connect.mutate();
+  }
+
   return (
-    <div className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <Label>Provider</Label>
+        <Label htmlFor="smtp-provider">Provider</Label>
         <Select value={providerId} onValueChange={setProviderId}>
-          <SelectTrigger>
+          <SelectTrigger id="smtp-provider">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -440,24 +509,12 @@ function SmtpConnect({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="smtp-secret">{provider.keyLabel}</Label>
-        <div className="relative">
-          <Input
-            id="smtp-secret"
-            type={showSecret ? "text" : "password"}
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            className="pr-10"
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            onClick={() => setShowSecret((v) => !v)}
-            aria-label={showSecret ? "Hide" : "Show"}
-            className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
-          >
-            {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
-        </div>
+        <PasswordInput
+          id="smtp-secret"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          autoComplete="off"
+        />
         {provider.keyHint && (
           <p className="text-xs text-muted-foreground">{provider.keyHint}</p>
         )}
@@ -476,13 +533,18 @@ function SmtpConnect({
         </p>
       </div>
 
-      <DialogFooter>
-        <Button onClick={() => connect.mutate()} disabled={connect.isPending || missing}>
+      <DialogFooter className="items-center">
+        {missing && (
+          <span className="mr-auto text-xs text-muted-foreground">
+            Fill in the required fields to connect.
+          </span>
+        )}
+        <Button type="submit" disabled={connect.isPending || missing}>
           {connect.isPending && <Spinner className="size-4" />}
           Connect email
         </Button>
       </DialogFooter>
-    </div>
+    </form>
   );
 }
 
@@ -591,6 +653,13 @@ function GithubDeviceConnect({
           <Spinner className="size-3.5" />
           Waiting for you to authorize…
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setState({ phase: "idle" })}
+        >
+          Cancel
+        </Button>
       </div>
     );
   }
@@ -621,7 +690,7 @@ function GithubDeviceConnect({
       <DialogFooter className="items-center">
         <button
           type="button"
-          className="mr-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
+          className="mr-auto rounded-sm text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={onUseToken}
         >
           Use a token instead

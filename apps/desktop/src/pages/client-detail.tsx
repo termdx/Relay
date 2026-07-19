@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FolderGit2, Link2, Plus } from "lucide-react";
+import { FolderGit2, Link2, Plus } from "lucide-react";
 import * as React from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
+import { ClickableRow } from "@/components/clickable-row";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,24 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { backend } from "@/lib/api/backend";
 import { ApiError } from "@/lib/api/http";
-import type { ProjectStatus } from "@/lib/api/types";
-
-const PROJECT_STATUS_META: Record<
-  ProjectStatus,
-  { label: string; variant: "success" | "warning" | "outline" }
-> = {
-  ACTIVE: { label: "Active", variant: "success" },
-  PAUSED: { label: "Paused", variant: "warning" },
-  COMPLETED: { label: "Completed", variant: "outline" },
-};
+import { projectStatusMeta } from "@/lib/status";
 
 export function ClientDetailPage() {
   const { id = "" } = useParams();
-  const navigate = useNavigate();
   const client = useQuery({
     queryKey: ["clients", id],
     queryFn: () => backend.clients.get(id),
@@ -43,22 +36,52 @@ export function ClientDetailPage() {
 
   if (client.isLoading) {
     return (
-      <div className="flex justify-center py-16 text-muted-foreground">
-        <Spinner className="size-5" />
-      </div>
+      <>
+        <PageHeader
+          title="Client"
+          breadcrumb={[
+            { label: "Clients", to: "/clients" },
+            { label: "…" },
+          ]}
+        />
+        <div className="px-8 py-6" aria-hidden="true">
+          <Skeleton className="mb-6 h-4 w-96" />
+          <Skeleton className="mb-3 h-3 w-24" />
+          <div className="overflow-hidden rounded-lg border border-border">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0"
+              >
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="ml-auto h-5 w-16 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
     );
   }
+
   if (client.isError || !client.data) {
     return (
-      <div className="px-8 py-6">
-        <p className="text-sm text-destructive">Couldn’t load this client.</p>
-        <Button variant="outline" asChild className="mt-4">
-          <Link to="/clients">
-            <ArrowLeft className="size-4" />
-            Back to clients
-          </Link>
-        </Button>
-      </div>
+      <>
+        <PageHeader
+          title="Client"
+          breadcrumb={[
+            { label: "Clients", to: "/clients" },
+            { label: "Not found" },
+          ]}
+        />
+        <div className="px-8 py-6">
+          <ErrorState
+            title="Couldn't load this client"
+            description="It may have been deleted, or the backend is unreachable."
+            onRetry={() => client.refetch()}
+          />
+        </div>
+      </>
     );
   }
 
@@ -68,17 +91,11 @@ export function ClientDetailPage() {
       <PageHeader
         title={c.name}
         description={[c.company, c.email].filter(Boolean).join(" · ")}
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/clients">
-                <ArrowLeft className="size-4" />
-                Back
-              </Link>
-            </Button>
-            <NewProjectDialog clientId={c.id} />
-          </div>
-        }
+        breadcrumb={[
+          { label: "Clients", to: "/clients" },
+          { label: c.name },
+        ]}
+        actions={<NewProjectDialog clientId={c.id} />}
       />
 
       <div className="px-8 py-6">
@@ -105,12 +122,12 @@ export function ClientDetailPage() {
               </thead>
               <tbody>
                 {c.projects.map((p) => {
-                  const status = PROJECT_STATUS_META[p.status];
+                  const status = projectStatusMeta(p.status);
                   return (
-                    <tr
+                    <ClickableRow
                       key={p.id}
-                      onClick={() => navigate(`/projects/${p.id}`)}
-                      className="cursor-pointer border-b border-border last:border-0 hover:bg-accent/40"
+                      to={`/projects/${p.id}`}
+                      label={p.name}
                     >
                       <td className="px-4 py-3 font-medium">{p.name}</td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
@@ -119,25 +136,19 @@ export function ClientDetailPage() {
                       <td className="px-4 py-3">
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </td>
-                    </tr>
+                    </ClickableRow>
                   );
                 })}
               </tbody>
             </table>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-12 text-center">
-            <div className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-              <FolderGit2 className="size-5" />
-            </div>
-            <div>
-              <p className="font-medium">No projects yet</p>
-              <p className="text-sm text-muted-foreground">
-                Meetings, todos, and the timeline all live on a project.
-              </p>
-            </div>
-            <NewProjectDialog clientId={c.id} />
-          </div>
+          <EmptyState
+            icon={FolderGit2}
+            title="No projects yet"
+            description="Meetings, todos, and the timeline all live on a project."
+            action={<NewProjectDialog clientId={c.id} />}
+          />
         )}
       </div>
     </>
@@ -201,6 +212,15 @@ function NewProjectDialog({ clientId }: { clientId: string }) {
   const [githubRepo, setGithubRepo] = React.useState("");
   const [description, setDescription] = React.useState("");
 
+  // Fresh form every time the dialog opens.
+  React.useEffect(() => {
+    if (open) {
+      setName("");
+      setGithubRepo("");
+      setDescription("");
+    }
+  }, [open]);
+
   const create = useMutation({
     mutationFn: backend.projects.create,
     onSuccess: (project) => {
@@ -259,9 +279,13 @@ function NewProjectDialog({ clientId }: { clientId: string }) {
               id="project-repo"
               value={githubRepo}
               onChange={(e) => setGithubRepo(e.target.value)}
-              placeholder="owner/repo"
+              placeholder="acme/website"
               pattern="[^/\s]+/[^/\s]+"
+              aria-describedby="project-repo-hint"
             />
+            <p id="project-repo-hint" className="text-xs text-muted-foreground">
+              Format: owner/repo — e.g. acme/website.
+            </p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="project-description">Description</Label>
