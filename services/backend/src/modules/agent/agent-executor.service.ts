@@ -25,6 +25,48 @@ export const WORKFLOW_RUN = 'workflow.run';
 
 const DEFAULT_MAX_TURNS = 12;
 
+interface OpenAiToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+interface OpenAiMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content?: string;
+  tool_calls?: OpenAiToolCall[];
+  tool_call_id?: string;
+}
+
+interface OpenAiToolDef {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: unknown;
+  };
+}
+
+/**
+ * Gemini tool schemas are authored with its Type enum, which serializes
+ * uppercase ("OBJECT", "STRING"). OpenAI-compatible APIs (OpenRouter) want
+ * lowercase JSON Schema types — lowercase every `type` string, recursively.
+ */
+function toJsonSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(toJsonSchema);
+  if (node && typeof node === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      out[key] =
+        key === 'type' && typeof value === 'string'
+          ? value.toLowerCase()
+          : toJsonSchema(value);
+    }
+    return out;
+  }
+  return node;
+}
+
 /**
  * Executes agent runs: a native function-calling loop (Gemini) over the
  * AgentToolsService registry. Delivered by the outbox but executed
@@ -160,6 +202,26 @@ export class AgentExecutorService implements OnModuleInit {
     const available = this.tools.select(run.tools);
     const trace: ToolTraceEntry[] = [];
 
+    // Route by the agent's chosen model, not the global chat provider.
+    // openrouter/* runs OpenAI-style tool calling; gemini/* uses Gemini's
+    // native function calling. Either path is real function calling.
+    if (run.model.startsWith('openrouter/')) {
+      const orKey = this.config.get<string>('OPENROUTER_API_KEY');
+      if (!orKey) {
+        throw new Error(
+          'This agent uses an OpenRouter model, but no OpenRouter provider is connected. Add one in Runtime → AI providers.',
+        );
+      }
+      return this.runOpenRouterLoop(
+        run,
+        context,
+        available,
+        trace,
+        run.model.slice('openrouter/'.length),
+        orKey,
+      );
+    }
+
     const aiProvider = this.config
       .get<string>('AI_PROVIDER', 'stub')
       .toLowerCase();
@@ -289,6 +351,143 @@ export class AgentExecutorService implements OnModuleInit {
         `(stopped after ${maxTurns} tool turns — partial work is in the trace)`,
       trace,
     };
+  }
+
+  /**
+   * OpenAI-style tool-calling loop against OpenRouter — the same agent
+   * contract as the Gemini path, so any tool-capable model OpenRouter serves
+   * can drive an agent. Reuses generateWithQuotaRetry for 429 backoff.
+   */
+  private async runOpenRouterLoop(
+    run: Pick<AgentRun, 'agentName' | 'tools' | 'instruction'>,
+    context: AgentToolContext,
+    available: ReturnType<AgentToolsService['select']>,
+    trace: ToolTraceEntry[],
+    model: string,
+    apiKey: string,
+  ): Promise<{ output: string; trace: ToolTraceEntry[] }> {
+    const tools = available.map((tool) => ({
+      type: 'function' as const,
+      function: {
+        name: tool.name,
+        description: tool.description,
+        // Gemini's Type enum serializes uppercase (OBJECT/STRING); OpenAI
+        // tool schemas need lowercase JSON Schema types.
+        parameters: toJsonSchema(tool.parameters),
+      },
+    }));
+
+    const messages: OpenAiMessage[] = [
+      {
+        role: 'system',
+        content:
+          `You are "${run.agentName}", an agent for a software agency, working on one client project. ` +
+          `Use the available tools to inspect the project and, when the instruction asks for it, to create todos or record decisions. ` +
+          `Only state facts you found via tools. ` +
+          `CRITICAL: if a tool result starts with "ERROR:" or reports something unavailable, that action DID NOT HAPPEN — say so plainly and never claim it succeeded. ` +
+          `Finish with a concise report of what you found and did.`,
+      },
+      { role: 'user', content: `INSTRUCTION: ${run.instruction}` },
+    ];
+
+    const maxTurns = Number(
+      this.config.get('AGENT_MAX_TURNS', String(DEFAULT_MAX_TURNS)),
+    );
+    for (let turn = 0; turn < maxTurns; turn++) {
+      const message = await this.generateWithQuotaRetry(() =>
+        this.openRouterChat(apiKey, model, messages, tools),
+      );
+      const calls = message.tool_calls ?? [];
+      if (calls.length === 0) {
+        return { output: message.content?.trim() || '(no output)', trace };
+      }
+      messages.push({
+        role: 'assistant',
+        content: message.content ?? '',
+        tool_calls: calls,
+      });
+      for (const call of calls) {
+        const tool = available.find((t) => t.name === call.function.name);
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.function.arguments || '{}') as Record<
+            string,
+            unknown
+          >;
+        } catch {
+          /* malformed args → run the tool with none */
+        }
+        let result: string;
+        try {
+          result = tool
+            ? await tool.execute(context, args)
+            : `Unknown tool "${call.function.name}".`;
+        } catch (error) {
+          result = `Tool failed: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        trace.push({
+          tool: call.function.name,
+          args,
+          result: result.slice(0, 1000),
+        });
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: result,
+        });
+      }
+    }
+
+    messages.push({
+      role: 'user',
+      content:
+        'Stop using tools now. Summarize concisely what you found, what you did, and anything you could not finish.',
+    });
+    const final = await this.generateWithQuotaRetry(() =>
+      this.openRouterChat(apiKey, model, messages, undefined),
+    );
+    return {
+      output:
+        final.content?.trim() ||
+        `(stopped after ${maxTurns} tool turns — partial work is in the trace)`,
+      trace,
+    };
+  }
+
+  /** One OpenRouter chat-completions call, returning the assistant message. */
+  private async openRouterChat(
+    apiKey: string,
+    model: string,
+    messages: OpenAiMessage[],
+    tools: OpenAiToolDef[] | undefined,
+  ): Promise<OpenAiMessage> {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+        'HTTP-Referer': 'https://github.com/termdx/Relay',
+        'X-Title': 'Relay',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        ...(tools ? { tools } : {}),
+        temperature: 0.2,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(
+        `OpenRouter chat failed (HTTP ${res.status}): ${detail.slice(0, 300)}`,
+      );
+    }
+    const data = (await res.json()) as {
+      choices?: { message?: OpenAiMessage }[];
+    };
+    const message = data.choices?.[0]?.message;
+    if (!message) throw new Error('OpenRouter returned no message.');
+    return message;
   }
 
   /**

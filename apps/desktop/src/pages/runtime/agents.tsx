@@ -51,6 +51,44 @@ import { cn } from "@/lib/utils";
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 
+/**
+ * OpenRouter's public model catalog, filtered to free models that advertise
+ * tool calling — the only ones an agent can actually drive. Prefixed
+ * "openrouter/" so the executor routes them to the OpenAI-style loop.
+ */
+async function openRouterFreeToolModels(): Promise<string[]> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/models");
+    if (!res.ok) return OPENROUTER_FREE_FALLBACK;
+    const data = (await res.json()) as {
+      data?: { id?: string; supported_parameters?: string[] }[];
+    };
+    const found = (data.data ?? [])
+      .filter(
+        (m) =>
+          typeof m.id === "string" &&
+          m.id.endsWith(":free") &&
+          Array.isArray(m.supported_parameters) &&
+          m.supported_parameters.includes("tools"),
+      )
+      .map((m) => `openrouter/${m.id}`)
+      .sort();
+    return found.length > 0 ? found : OPENROUTER_FREE_FALLBACK;
+  } catch {
+    return OPENROUTER_FREE_FALLBACK;
+  }
+}
+
+/**
+ * Only used if the live catalog can't be reached. OpenRouter's free tier
+ * rotates, so these can go stale — the dynamic fetch above is authoritative.
+ */
+const OPENROUTER_FREE_FALLBACK = [
+  "openrouter/openai/gpt-oss-20b:free",
+  "openrouter/google/gemma-4-31b-it:free",
+  "openrouter/nvidia/nemotron-nano-9b-v2:free",
+];
+
 export function RuntimeAgentsPage() {
   const { root } = useRuntimeWorkspace();
   const cwd = root!;
@@ -856,7 +894,14 @@ function AgentDialog({
               .catch(() => [] as string[]),
           ),
         );
-        const found = lists.flat().filter(toolCapable);
+        const gemini = lists.flat().filter(toolCapable);
+        // If an OpenRouter provider is connected, add its free, tool-capable
+        // models — a separate quota pool from Gemini, so agents keep running
+        // when the Gemini free tier is throttled.
+        const openrouter = providers.some((p) => p.provider === "openrouter")
+          ? await openRouterFreeToolModels()
+          : [];
+        const found = [...gemini, ...openrouter];
         return found.length > 0 ? found : fallback;
       } catch {
         return fallback;
