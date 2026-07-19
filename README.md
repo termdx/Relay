@@ -78,6 +78,7 @@ and attaches it to a release tagged `dist-<n>`:
 | Desktop bundles — `.dmg` / `.deb` (Tauri, sidecar included) | macOS arm64, Linux x64 |
 | `portal-dist.tar.gz` — client portal static bundle | any |
 | `ghcr.io/<owner>/relay-backend` — backend Docker image | any |
+| `relay-backend-image.tar.gz` — same image as a loadable tarball (used when GHCR is private) | any |
 
 ```bash
 git push origin main:dist     # cut a release
@@ -97,6 +98,8 @@ curl -fsSL https://raw.githubusercontent.com/termdx/Relay/main/scripts/install-s
 Requires Docker and DNS (`relay.youragency.com` → the box). The installer:
 
 - installs `relay-runtime` to `/usr/local/bin` + a systemd service
+- pulls the backend image from GHCR, or — if the package is private — loads
+  the `relay-backend-image.tar.gz` asset from the release instead
 - generates a **runtime token** (`RELAY_RUNTIME_TOKEN`) — the daemon rejects
   any request without it; the token is printed at the end for the desktop
 - exports `RELAY_PUBLIC_URL=https://<domain>` so approval links, portal
