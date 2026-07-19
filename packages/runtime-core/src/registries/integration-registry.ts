@@ -38,7 +38,9 @@ export class IntegrationRegistry {
     return this.store.list();
   }
 
-  /** Install an integration, storing supplied credential values as secrets. */
+  /** Install an integration, storing supplied credential values as secrets.
+   * Upserts: re-adding an installed integration updates its credentials
+   * (reconnects must never crash and strand a freshly granted token). */
   async add(
     id: string,
     credentials: Record<string, string>,
@@ -50,7 +52,7 @@ export class IntegrationRegistry {
       const value = credentials[field.name];
       if (value) await this.secrets.set(field.secretRef, value);
     }
-    await this.store.create(template);
+    await this.store.write(template);
     return template;
   }
 

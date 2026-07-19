@@ -62,7 +62,9 @@ export async function startGithubDeviceFlow(
 ): Promise<GithubDeviceStart> {
   const data = await githubForm(DEVICE_CODE_URL, {
     client_id: clientId,
-    scope: 'repo',
+    // repo: issues in/out + CI reads; admin:repo_hook: webhook registration
+    // so Relay can wire inbound events without manual repo settings.
+    scope: 'repo admin:repo_hook',
   });
   if (typeof data.device_code !== 'string') {
     throw new Error(
