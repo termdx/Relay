@@ -102,17 +102,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build & push
+      - name: Build & save
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/relay-backend
           IMAGE=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
           docker build -t "$IMAGE:dist-${{ github.run_number }}" -t "$IMAGE:latest" services/backend
-          docker push "$IMAGE:dist-${{ github.run_number }}"
-          docker push "$IMAGE:latest"
-          # Also ship the image as a release asset: installs keep working
-          # even when the GHCR package is private (org policy).
+          # The release tarball is the canonical distribution channel — the
+          # installer falls back to it whenever GHCR is private or unwritable.
           docker tag "$IMAGE:latest" relay-backend:release
           docker save relay-backend:release | gzip > relay-backend-image.tar.gz
+      - name: Push to GHCR (best-effort — org package policy may deny)
+        run: |
+          docker push "$IMAGE:dist-${{ github.run_number }}" && docker push "$IMAGE:latest" \
+            || echo "::warning::GHCR push denied — the release tarball still ships the image"
       - uses: actions/upload-artifact@v4
         with:
           name: backend-image
