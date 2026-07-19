@@ -809,7 +809,18 @@ function Ask({ projectId }: { projectId: string }) {
 /* ── approvals inbox ────────────────────────────────────────────────────── */
 
 function Approvals() {
-  const approvals = useQuery({ queryKey: ["approvals"], queryFn: portal.approvals });
+  // The client approves on the backend page (a separate tab), so the portal
+  // must re-read when it regains focus — and poll while anything is pending —
+  // or a just-approved item stays stuck as "waiting on you".
+  const approvals = useQuery({
+    queryKey: ["approvals"],
+    queryFn: portal.approvals,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((a) => a.status === "PENDING")
+        ? 8000
+        : false,
+  });
 
   if (approvals.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -837,6 +848,8 @@ function Approvals() {
                 </div>
                 <a
                   href={`${BACKEND_URL}${a.approvePath}`}
+                  target="_blank"
+                  rel="noopener"
                   className="shrink-0 rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
                 >
                   Review
