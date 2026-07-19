@@ -151,6 +151,24 @@ if [ -n "$DOMAIN" ]; then
   say "installing portal for https://$DOMAIN…"
   $SUDO mkdir -p /opt/relay/portal
   curl -fsSL "$PORTAL_URL" | $SUDO tar xz -C /opt/relay/portal
+
+  # Mirror the desktop bundles — teammates download from the agency's own
+  # domain (fast, local) instead of GitHub's CDN at https://<domain>/downloads/
+  say "mirroring desktop bundles → /downloads/…"
+  $SUDO mkdir -p /opt/relay/downloads
+  for pat in ".dmg" ".deb"; do
+    u=$(asset_url "$pat"); [ -n "$u" ] || continue
+    f=$(basename "$u")
+    if [ ! -f "/opt/relay/downloads/$f" ]; then
+      curl -fsSL "$u" -o /tmp/relay-mirror-asset
+      $SUDO mv /tmp/relay-mirror-asset "/opt/relay/downloads/$f"
+    fi
+    # Stable names so links never break across releases.
+    case "$pat" in
+      .dmg) $SUDO cp -f "/opt/relay/downloads/$f" /opt/relay/downloads/Relay.dmg ;;
+      .deb) $SUDO cp -f "/opt/relay/downloads/$f" /opt/relay/downloads/relay-desktop.deb ;;
+    esac
+  done
   $SUDO tee /etc/relay/Caddyfile >/dev/null <<CADDY
 $DOMAIN {
   encode gzip
@@ -166,6 +184,11 @@ $DOMAIN {
   handle_path /runtime/* {
     reverse_proxy localhost:51720
   }
+  # Desktop app downloads, mirrored from the release at install time.
+  handle_path /downloads/* {
+    root * /srv/downloads
+    file_server browse
+  }
   handle {
     root * /srv/portal
     try_files {path} /index.html
@@ -177,6 +200,7 @@ CADDY
   docker run -d --name relay-caddy --restart unless-stopped --network host \
     -v /etc/relay/Caddyfile:/etc/caddy/Caddyfile:ro \
     -v /opt/relay/portal:/srv/portal:ro \
+    -v /opt/relay/downloads:/srv/downloads:ro \
     -v relay_caddy_data:/data \
     caddy:2 >/dev/null
   say "portal live at https://$DOMAIN (TLS auto-provisions on first hit; DNS must point here)"
