@@ -115,10 +115,27 @@ for _ in $(seq 1 30); do
 done
 curl -fsS http://127.0.0.1:51720/health >/dev/null || die "daemon did not come up — check logs."
 
+WORKSPACE="$HOME/.relay/workspaces/default"
+rpc() { # rpc <json-path-array> <json-args-array>
+  curl -fsS -X POST http://127.0.0.1:51720/rpc \
+    -H "content-type: application/json" -H "x-relay-token: $RUNTIME_TOKEN" \
+    -d "{\"path\":$1,\"args\":$2}"
+}
+
+# A fresh workspace has no modules — install the base module that carries
+# the backend + postgres services, then bring the compose stack up.
+say "installing the base module (backend + postgres)…"
+rpc '["modules","add"]' "[\"$WORKSPACE\",\"projects\",true]" >/dev/null
+
 say "starting the stack (postgres + backend)…"
-curl -fsS -X POST http://127.0.0.1:51720/rpc \
-  -H "content-type: application/json" -H "x-relay-token: $RUNTIME_TOKEN" \
-  -d "{\"path\":[\"runtime\",\"up\"],\"args\":[\"$HOME/.relay/workspaces/default\"]}" >/dev/null
+rpc '["runtime","up"]' "[\"$WORKSPACE\"]" >/dev/null
+
+say "waiting for the backend…"
+for _ in $(seq 1 36); do
+  curl -fsS -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
+  sleep 5
+done
+curl -fsS -m 5 http://127.0.0.1:3000/health >/dev/null || die "backend did not become healthy — check: docker logs relay-backend-1"
 
 # ── portal at the domain ────────────────────────────────────────────────────
 if [ -n "$DOMAIN" ]; then
