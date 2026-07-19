@@ -30,8 +30,19 @@ import { Spinner } from "@/components/ui/spinner";
 import { runtime, RuntimeError } from "@/lib/api/runtime";
 import { useRuntimeWorkspace } from "@/lib/runtime-workspace";
 
-const PROVIDERS = ["gemini", "huggingface", "openai", "anthropic", "ollama", "openrouter"];
+const PROVIDERS = [
+  "gemini",
+  "huggingface",
+  "openai",
+  "anthropic",
+  "openrouter",
+  "ollama",
+  "litellm",
+];
+// Providers authenticated by an API key (vs. a local endpoint).
 const KEYED = new Set(["gemini", "huggingface", "openai", "anthropic", "openrouter"]);
+// Providers that also need a base URL/endpoint.
+const ENDPOINTED = new Set(["ollama", "litellm"]);
 
 export function RuntimeAiPage() {
   const { root } = useRuntimeWorkspace();
@@ -80,7 +91,9 @@ export function RuntimeAiPage() {
               provider={p.provider}
               defaultModel={p.defaultModel}
               hasApiKey={p.hasApiKey}
-              onRemoved={invalidate}
+              isDefault={p.isDefault}
+              soleProvider={providers.data.length === 1}
+              onChanged={invalidate}
             />
           ))}
         </div>
@@ -120,17 +133,31 @@ function ProviderRow({
   provider,
   defaultModel,
   hasApiKey,
-  onRemoved,
+  isDefault,
+  soleProvider,
+  onChanged,
 }: {
   cwd: string;
   id: string;
   provider: string;
   defaultModel?: string;
   hasApiKey: boolean;
-  onRemoved: () => void;
+  isDefault: boolean;
+  soleProvider: boolean;
+  onChanged: () => void;
 }) {
   const [confirmRemove, setConfirmRemove] = React.useState(false);
   const [probe, setProbe] = React.useState<ProbeResult | null>(null);
+
+  const setDefault = useMutation({
+    mutationFn: () => runtime.ai.setDefault(cwd, id),
+    onSuccess: () => {
+      toast.success(`"${id}" is now the default for Relay AI`);
+      onChanged();
+    },
+    onError: (e) =>
+      toast.error(e instanceof RuntimeError ? e.message : "Could not set default"),
+  });
 
   const health = useMutation({
     mutationFn: () => runtime.ai.health(cwd, id),
@@ -151,7 +178,7 @@ function ProviderRow({
     mutationFn: () => runtime.ai.remove(cwd, id),
     onSuccess: () => {
       toast.success(`Removed "${id}"`);
-      onRemoved();
+      onChanged();
     },
     onError: (e) => toast.error(e instanceof RuntimeError ? e.message : "Remove failed"),
   });
@@ -161,6 +188,7 @@ function ProviderRow({
       <div className="flex min-w-0 items-baseline gap-2">
         <span className="font-mono text-sm font-medium">{id}</span>
         <span className="text-xs text-muted-foreground">{provider}</span>
+        {isDefault && <Badge variant="primary">default</Badge>}
         {defaultModel && (
           <span className="truncate text-xs text-muted-foreground">
             · {defaultModel}
@@ -184,6 +212,17 @@ function ProviderRow({
         )}
       </div>
       <div className="flex items-center gap-1">
+        {!isDefault && !soleProvider && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDefault.mutate()}
+            disabled={setDefault.isPending}
+          >
+            {setDefault.isPending ? <Spinner className="size-4" /> : null}
+            Make default
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -233,6 +272,10 @@ function AddProviderDialog({
   const [endpoint, setEndpoint] = React.useState("");
   const [model, setModel] = React.useState("");
   const needsKey = KEYED.has(provider);
+  const showKey = needsKey || provider === "litellm"; // litellm key is optional
+  const showEndpoint = ENDPOINTED.has(provider);
+  const endpointRequired = provider === "litellm";
+  const canSubmit = (!needsKey || !!apiKey) && (!endpointRequired || !!endpoint);
 
   const add = useMutation({
     mutationFn: () =>
@@ -256,7 +299,7 @@ function AddProviderDialog({
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!add.isPending && (!needsKey || apiKey)) add.mutate();
+    if (!add.isPending && canSubmit) add.mutate();
   }
 
   return (
@@ -286,9 +329,11 @@ function AddProviderDialog({
               </SelectContent>
             </Select>
           </div>
-          {needsKey ? (
+          {showKey && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="key">API key</Label>
+              <Label htmlFor="key">
+                API key{provider === "litellm" ? " (optional)" : ""}
+              </Label>
               <PasswordInput
                 id="key"
                 value={apiKey}
@@ -297,14 +342,21 @@ function AddProviderDialog({
                 autoFocus
               />
             </div>
-          ) : (
+          )}
+          {showEndpoint && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="endpoint">Endpoint</Label>
+              <Label htmlFor="endpoint">
+                Endpoint{endpointRequired ? "" : " (optional)"}
+              </Label>
               <Input
                 id="endpoint"
                 value={endpoint}
                 onChange={(e) => setEndpoint(e.target.value)}
-                placeholder="http://localhost:11434"
+                placeholder={
+                  provider === "ollama"
+                    ? "http://localhost:11434"
+                    : "http://localhost:4000"
+                }
               />
             </div>
           )}
@@ -349,7 +401,7 @@ function AddProviderDialog({
           <DialogFooter>
             <Button
               type="submit"
-              disabled={add.isPending || (needsKey && !apiKey)}
+              disabled={add.isPending || !canSubmit}
             >
               {add.isPending ? <Spinner className="size-4" /> : <Plus className="size-4" />}
               Add provider

@@ -25,8 +25,12 @@ export interface AddAiProviderInput {
 const DEFAULT_CAPABILITIES: Record<string, string[]> = {
   gemini: ['draft', 'chat', 'embeddings'],
   huggingface: ['draft', 'chat', 'embeddings'],
-  // OpenRouter has no embeddings endpoint — pair it with Gemini/HF for those.
+  openai: ['draft', 'chat', 'embeddings'],
+  ollama: ['draft', 'chat', 'embeddings'],
+  litellm: ['draft', 'chat', 'embeddings'],
+  // No embeddings endpoint — pair these with Gemini/HF/OpenAI for those.
   openrouter: ['draft', 'chat'],
+  anthropic: ['draft', 'chat'],
 };
 
 /**
@@ -77,6 +81,23 @@ export class AiProviderRegistry {
       await this.secrets.delete(manifest.apiKeyRef);
     }
     await this.store.remove(id);
+  }
+
+  /**
+   * Make one provider the active default for all Relay AI (drafts, chat,
+   * embeddings): give it the top routing priority, everyone else zero.
+   */
+  async setDefault(id: string): Promise<void> {
+    await this.store.read(id); // throws if the provider isn't installed
+    for (const manifest of await this.store.readAll()) {
+      const priority = manifest.id === id ? 1 : 0;
+      if (manifest.routing.priority !== priority) {
+        await this.store.write({
+          ...manifest,
+          routing: { ...manifest.routing, priority },
+        });
+      }
+    }
   }
 
   async resolveApiKey(

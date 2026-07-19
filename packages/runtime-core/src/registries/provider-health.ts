@@ -70,6 +70,45 @@ export async function probeProvider(
           .sort();
         return { id: manifest.id, status: 'ok', models };
       }
+      case 'openai':
+      case 'litellm': {
+        if (!apiKey && manifest.provider === 'openai') {
+          return { id: manifest.id, status: 'error', detail: 'no API key configured' };
+        }
+        const base =
+          manifest.provider === 'openai'
+            ? 'https://api.openai.com/v1'
+            : (manifest.endpoint ?? 'http://localhost:4000').replace(/\/$/, '');
+        const res = await fetch(`${base}/models`, {
+          headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
+        });
+        if (!res.ok) {
+          return { id: manifest.id, status: 'error', detail: `HTTP ${res.status}` };
+        }
+        const data = (await res.json()) as { data?: { id?: string }[] };
+        const models = (data.data ?? [])
+          .map((m) => m.id)
+          .filter((n): n is string => Boolean(n))
+          .sort();
+        return { id: manifest.id, status: 'ok', models };
+      }
+      case 'anthropic': {
+        if (!apiKey) {
+          return { id: manifest.id, status: 'error', detail: 'no API key configured' };
+        }
+        const res = await fetch('https://api.anthropic.com/v1/models', {
+          headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        });
+        if (!res.ok) {
+          return { id: manifest.id, status: 'error', detail: `HTTP ${res.status} — key rejected` };
+        }
+        const data = (await res.json()) as { data?: { id?: string }[] };
+        const models = (data.data ?? [])
+          .map((m) => m.id)
+          .filter((n): n is string => Boolean(n))
+          .sort();
+        return { id: manifest.id, status: 'ok', models };
+      }
       case 'huggingface': {
         if (!apiKey) {
           return { id: manifest.id, status: 'error', detail: 'no API key configured' };

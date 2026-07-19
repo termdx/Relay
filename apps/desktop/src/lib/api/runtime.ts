@@ -141,6 +141,8 @@ export const runtime = {
       defaultModel?: string;
     }) => rpc<AiProviderSummary>(["ai", "add"], [input]),
     remove: (cwd: string, id: string) => rpc<void>(["ai", "remove"], [cwd, id]),
+    setDefault: (cwd: string, id: string) =>
+      rpc<void>(["ai", "setDefault"], [cwd, id]),
     health: (cwd: string, id: string) =>
       rpc<ProviderHealth>(["ai", "health"], [cwd, id]),
     models: (cwd: string, id: string) =>

@@ -30,14 +30,25 @@ function toInfo(engine: RuntimeEngine): WorkspaceInfo {
   };
 }
 
-function toAiSummary(manifest: AiProviderManifest): AiProviderSummary {
+function toAiSummary(
+  manifest: AiProviderManifest,
+  isDefault = manifest.routing.priority > 0,
+): AiProviderSummary {
   return {
     id: manifest.id,
     provider: manifest.provider,
     defaultModel: manifest.defaultModel,
     hasApiKey: Boolean(manifest.apiKeyRef),
     models: manifest.models,
+    isDefault,
   };
+}
+
+/** The provider Relay AI actually uses: top priority, first on a tie. */
+function defaultIdOf(manifests: AiProviderManifest[]): string | undefined {
+  return [...manifests].sort(
+    (a, b) => b.routing.priority - a.routing.priority,
+  )[0]?.id;
 }
 
 /**
@@ -81,7 +92,9 @@ export class InProcessClient implements RuntimeApi {
     },
     list: async (cwd): Promise<AiProviderSummary[]> => {
       const engine = await RuntimeEngine.open(cwd);
-      return (await engine.ai.list()).map(toAiSummary);
+      const manifests = await engine.ai.list();
+      const defaultId = defaultIdOf(manifests);
+      return manifests.map((m) => toAiSummary(m, m.id === defaultId));
     },
     info: async (cwd, id): Promise<AiProviderSummary> => {
       const engine = await RuntimeEngine.open(cwd);
@@ -90,6 +103,10 @@ export class InProcessClient implements RuntimeApi {
     remove: async (cwd, id): Promise<void> => {
       const engine = await RuntimeEngine.open(cwd);
       await engine.ai.remove(id);
+    },
+    setDefault: async (cwd, id): Promise<void> => {
+      const engine = await RuntimeEngine.open(cwd);
+      await engine.ai.setDefault(id);
     },
     health: async (cwd, id) => {
       const engine = await RuntimeEngine.open(cwd);

@@ -104,3 +104,28 @@ export class HfEmbedder implements Embedder {
     return vectors;
   }
 }
+
+/** Anything with an OpenAI-style /embeddings surface (OpenAI, LiteLLM, Ollama). */
+export interface EmbedClient {
+  embed(model: string, texts: string[], dimensions?: number): Promise<number[][]>;
+}
+
+/** OpenAI-compatible Embedder — requests 768 dims, then enforces them. */
+export class OpenAiEmbedder implements Embedder {
+  constructor(
+    private readonly client: EmbedClient,
+    private readonly model: string,
+  ) {}
+
+  async embed(texts: string[]): Promise<number[][]> {
+    const vectors = await this.client.embed(this.model, texts, EMBEDDING_DIMENSIONS);
+    for (const vector of vectors) {
+      if (vector.length !== EMBEDDING_DIMENSIONS) {
+        throw new Error(
+          `Embed model "${this.model}" returned ${vector.length} dims; the knowledge base needs ${EMBEDDING_DIMENSIONS} (use a 768-dim model, e.g. OpenAI text-embedding-3-small or Ollama nomic-embed-text).`,
+        );
+      }
+    }
+    return vectors;
+  }
+}

@@ -213,6 +213,7 @@ export interface AiProviderSummary {
   defaultModel?: string;
   hasApiKey: boolean;
   models: string[];
+  isDefault: boolean;
 }
 
 export interface ModuleSummary {

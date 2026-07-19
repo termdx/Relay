@@ -48,6 +48,8 @@ export interface AiProviderSummary {
   defaultModel?: string;
   hasApiKey: boolean;
   models: string[];
+  /** True when this is the active provider for Relay AI (top priority). */
+  isDefault: boolean;
 }
 
 export interface AiHealth {
@@ -62,6 +64,7 @@ export interface AiApi {
   list(cwd: string): Promise<AiProviderSummary[]>;
   info(cwd: string, id: string): Promise<AiProviderSummary>;
   remove(cwd: string, id: string): Promise<void>;
+  setDefault(cwd: string, id: string): Promise<void>;
   health(cwd: string, id: string): Promise<AiHealth>;
   models(cwd: string, id: string): Promise<string[]>;
 }

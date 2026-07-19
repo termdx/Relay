@@ -75,7 +75,29 @@ export function aiProviderEnv(
       return {
         AI_PROVIDER: 'ollama',
         OLLAMA_BASE_URL: provider.endpoint ?? 'http://localhost:11434',
-        OLLAMA_MODEL: provider.defaultModel ?? '',
+        OLLAMA_MODEL: provider.defaultModel ?? 'llama3.1',
+        OLLAMA_EMBED_MODEL: 'nomic-embed-text',
+      };
+    case 'openai':
+      return {
+        AI_PROVIDER: 'openai',
+        OPENAI_API_KEY: apiKey ?? '',
+        OPENAI_MODEL: provider.defaultModel ?? 'gpt-4o-mini',
+        OPENAI_EMBED_MODEL: 'text-embedding-3-small',
+      };
+    case 'anthropic':
+      return {
+        AI_PROVIDER: 'anthropic',
+        ANTHROPIC_API_KEY: apiKey ?? '',
+        ANTHROPIC_MODEL: provider.defaultModel ?? 'claude-3-5-sonnet-latest',
+      };
+    case 'litellm':
+      return {
+        AI_PROVIDER: 'litellm',
+        LITELLM_BASE_URL: provider.endpoint ?? 'http://localhost:4000',
+        LITELLM_API_KEY: apiKey ?? '',
+        LITELLM_MODEL: provider.defaultModel ?? '',
+        LITELLM_EMBED_MODEL: 'text-embedding-3-small',
       };
     default:
       return { AI_PROVIDER: provider.provider };
