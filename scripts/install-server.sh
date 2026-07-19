@@ -159,10 +159,10 @@ if [ -n "$DOMAIN" ]; then
   for pat in ".dmg" ".deb"; do
     u=$(asset_url "$pat"); [ -n "$u" ] || continue
     f=$(basename "$u")
-    if [ ! -f "/opt/relay/downloads/$f" ]; then
-      curl -fsSL "$u" -o /tmp/relay-mirror-asset
-      $SUDO mv /tmp/relay-mirror-asset "/opt/relay/downloads/$f"
-    fi
+    # Always refresh — the file name stays the same across releases but the
+    # contents don't.
+    curl -fsSL "$u" -o /tmp/relay-mirror-asset
+    $SUDO mv /tmp/relay-mirror-asset "/opt/relay/downloads/$f"
     # Stable names so links never break across releases.
     case "$pat" in
       .dmg) $SUDO cp -f "/opt/relay/downloads/$f" /opt/relay/downloads/Relay.dmg ;;

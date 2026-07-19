@@ -1,18 +1,14 @@
 import { useMutation } from "@tanstack/react-query";
-import { BellRing, Save, Server, Upload, User, X } from "lucide-react";
+import { BellRing, Save, Upload, User, X } from "lucide-react";
 import * as React from "react";
 import { PageHeader } from "@/components/page-header";
+import { ServerSettingsCard } from "@/components/server-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { backend } from "@/lib/api/backend";
-import {
-  ApiError,
-  getServerConfig,
-  LOCAL_SERVER,
-  setServerConfig,
-} from "@/lib/api/http";
+import { ApiError } from "@/lib/api/http";
 import { useAuth } from "@/lib/auth";
 import {
   nativeNotificationsEnabled,
@@ -30,7 +26,7 @@ export function SettingsPage() {
       <div className="flex max-w-xl flex-col gap-8 px-8 py-6">
         <ProfileSection />
         <NotificationsSection />
-        <ServerSection />
+        <ServerSettingsCard />
       </div>
     </>
   );
@@ -139,97 +135,6 @@ function ProfileSection() {
 }
 
 /** Point the desktop at an agency-hosted server instead of localhost. */
-function ServerSection() {
-  const current = getServerConfig();
-  const [backendUrlValue, setBackendUrlValue] = React.useState(current.backendUrl);
-  const [runtimeUrlValue, setRuntimeUrlValue] = React.useState(current.runtimeUrl);
-  const [token, setToken] = React.useState(current.runtimeToken);
-  const isLocal =
-    backendUrlValue === LOCAL_SERVER.backendUrl &&
-    runtimeUrlValue === LOCAL_SERVER.runtimeUrl;
-
-  function save() {
-    setServerConfig({
-      backendUrl: backendUrlValue.trim() || LOCAL_SERVER.backendUrl,
-      runtimeUrl: runtimeUrlValue.trim() || LOCAL_SERVER.runtimeUrl,
-      runtimeToken: token.trim(),
-    });
-    toast.success("Server saved — reloading to reconnect");
-    setTimeout(() => window.location.reload(), 800);
-  }
-
-  function resetLocal() {
-    setBackendUrlValue(LOCAL_SERVER.backendUrl);
-    setRuntimeUrlValue(LOCAL_SERVER.runtimeUrl);
-    setToken("");
-    setServerConfig(LOCAL_SERVER);
-    toast.success("Back to the local stack — reloading");
-    setTimeout(() => window.location.reload(), 800);
-  }
-
-  return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <Server className="size-4" />
-        Agency server
-      </h2>
-      <p className="mb-4 text-xs text-muted-foreground">
-        {isLocal
-          ? "Connected to the local stack on this machine."
-          : "Connected to a remote agency server."}{" "}
-        Point at a hosted Relay (e.g. https://relay.youragency.com) to work
-        against the agency's shared stack.
-      </p>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="srv-backend">Backend URL</Label>
-          <Input
-            id="srv-backend"
-            value={backendUrlValue}
-            onChange={(e) => setBackendUrlValue(e.target.value)}
-            placeholder="https://relay.youragency.com"
-            className="font-mono text-xs"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="srv-runtime">Runtime URL</Label>
-            <Input
-              id="srv-runtime"
-              value={runtimeUrlValue}
-              onChange={(e) => setRuntimeUrlValue(e.target.value)}
-              placeholder="https://relay.youragency.com/runtime"
-              className="font-mono text-xs"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="srv-token">Runtime token</Label>
-            <Input
-              id="srv-token"
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="from the server installer"
-              autoComplete="off"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={save}>
-            <Save className="size-4" />
-            Save & reconnect
-          </Button>
-          {!isLocal && (
-            <Button variant="outline" onClick={resetLocal}>
-              Use local stack
-            </Button>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function NotificationsSection() {
   const [native, setNative] = React.useState(nativeNotificationsEnabled());
   const inTauri = "__TAURI_INTERNALS__" in window;
