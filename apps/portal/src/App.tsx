@@ -87,11 +87,19 @@ function JoinLanding() {
   const branding = useBranding();
   const inviteUrl = window.location.href;
   const [copied, setCopied] = React.useState(false);
+  const [copiedCmd, setCopiedCmd] = React.useState(false);
+  const XATTR_CMD = "xattr -cr /Applications/Relay.app";
 
   async function copy() {
     await navigator.clipboard.writeText(inviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
+  }
+
+  async function copyCmd() {
+    await navigator.clipboard.writeText(XATTR_CMD);
+    setCopiedCmd(true);
+    setTimeout(() => setCopiedCmd(false), 1600);
   }
 
   return (
@@ -122,6 +130,22 @@ function JoinLanding() {
             >
               Download for Linux
             </a>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            On macOS, if it says <span className="font-medium">“Relay is
+            damaged”</span>, that’s just Gatekeeper on the unsigned app —
+            clear the quarantine flag once in Terminal:
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs">
+              {XATTR_CMD}
+            </code>
+            <button
+              onClick={copyCmd}
+              className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+            >
+              {copiedCmd ? "Copied ✓" : "Copy"}
+            </button>
           </div>
         </div>
 
