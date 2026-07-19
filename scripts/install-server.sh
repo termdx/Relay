@@ -77,8 +77,9 @@ fi
 
 # ── runtime service ─────────────────────────────────────────────────────────
 # Re-runs keep the existing token so already-connected desktops stay valid.
-if [ -f /etc/relay/runtime.env ] && grep -q RELAY_RUNTIME_TOKEN /etc/relay/runtime.env; then
-  RUNTIME_TOKEN=$(grep '^RELAY_RUNTIME_TOKEN=' /etc/relay/runtime.env | cut -d= -f2)
+# (The env file is root-owned mode 600 — read it with sudo.)
+RUNTIME_TOKEN=$($SUDO cat /etc/relay/runtime.env 2>/dev/null | grep '^RELAY_RUNTIME_TOKEN=' | cut -d= -f2 || true)
+if [ -n "$RUNTIME_TOKEN" ]; then
   say "reusing existing runtime token."
 else
   RUNTIME_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)
