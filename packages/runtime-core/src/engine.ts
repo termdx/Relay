@@ -361,6 +361,13 @@ export class RuntimeEngine {
   /** Generate artifacts, then start the stack. */
   async up(): Promise<GenerateResult> {
     const result = await this.generate();
+    // An empty compose makes docker fail with the baffling "no service
+    // selected" — say what's actually wrong instead.
+    if (result.services.length === 0) {
+      throw new Error(
+        'No modules installed — the stack has nothing to run. Install the "projects" module (Runtime → Modules) and try again.',
+      );
+    }
     await this.lifecycle.up();
     return result;
   }
