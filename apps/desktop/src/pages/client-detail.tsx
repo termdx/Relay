@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FolderGit2, Plus } from "lucide-react";
+import { ArrowLeft, FolderGit2, Link2, Plus } from "lucide-react";
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
@@ -88,6 +88,8 @@ export function ClientDetailPage() {
           </p>
         ) : null}
 
+        <PortalAccessCard clientId={c.id} clientName={c.name} />
+
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Projects
         </h2>
@@ -139,6 +141,55 @@ export function ClientDetailPage() {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * Portal access without email: mints a single-use sign-in link (15 min) the
+ * founder can paste into whatever channel the client is on.
+ */
+function PortalAccessCard({
+  clientId,
+  clientName,
+}: {
+  clientId: string;
+  clientName: string;
+}) {
+  const link = useMutation({
+    mutationFn: () => backend.clients.portalLink(clientId),
+    onSuccess: async ({ url }) => {
+      await navigator.clipboard.writeText(url);
+      toast.success("Sign-in link copied — valid 15 minutes, single use");
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not create sign-in link",
+      ),
+  });
+
+  return (
+    <div className="mb-6 flex max-w-2xl items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
+      <div>
+        <p className="text-sm font-medium">Client portal</p>
+        <p className="text-sm text-muted-foreground">
+          Send {clientName} a sign-in link — they see progress and approvals,
+          and can ask Relay AI.
+        </p>
+      </div>
+      <Button
+        variant="outline"
+        className="shrink-0"
+        onClick={() => link.mutate()}
+        disabled={link.isPending}
+      >
+        {link.isPending ? (
+          <Spinner className="size-4" />
+        ) : (
+          <Link2 className="size-4" />
+        )}
+        Copy sign-in link
+      </Button>
+    </div>
   );
 }
 

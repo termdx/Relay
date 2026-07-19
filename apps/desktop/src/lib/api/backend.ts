@@ -48,6 +48,11 @@ export const backend = {
         method: "PATCH",
         body,
       }),
+    portalLink: (id: string) =>
+      backendRequest<{ url: string; expiresAt: string }>(
+        `/clients/${id}/portal-link`,
+        { method: "POST" },
+      ),
   },
   projects: {
     list: () => backendRequest<ProjectWithClient[]>("/projects"),
