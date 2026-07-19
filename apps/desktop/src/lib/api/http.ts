@@ -1,7 +1,44 @@
-/** Base URLs. Hardcoded to localhost for the self-hosted single-machine case
- * (model (a)); becomes configurable when the desktop points at a remote VPS. */
-export const BACKEND_URL = "http://localhost:3000";
-export const RUNTIME_URL = "http://127.0.0.1:51720";
+/**
+ * Server endpoints. Local single-machine by default; Settings → Agency
+ * server points the desktop at an agency-hosted runtime/backend instead.
+ */
+export interface ServerConfig {
+  backendUrl: string;
+  runtimeUrl: string;
+  /** Sent as X-Relay-Token to a remote runtime daemon (RELAY_RUNTIME_TOKEN). */
+  runtimeToken: string;
+}
+
+const SERVER_KEY = "relay.server";
+
+export const LOCAL_SERVER: ServerConfig = {
+  backendUrl: "http://localhost:3000",
+  runtimeUrl: "http://127.0.0.1:51720",
+  runtimeToken: "",
+};
+
+export function getServerConfig(): ServerConfig {
+  try {
+    const stored = localStorage.getItem(SERVER_KEY);
+    if (!stored) return LOCAL_SERVER;
+    return { ...LOCAL_SERVER, ...(JSON.parse(stored) as Partial<ServerConfig>) };
+  } catch {
+    return LOCAL_SERVER;
+  }
+}
+
+export function setServerConfig(config: ServerConfig): void {
+  localStorage.setItem(SERVER_KEY, JSON.stringify(config));
+}
+
+export function backendUrl(): string {
+  return getServerConfig().backendUrl.replace(/\/$/, "");
+}
+
+export function runtimeUrl(): string {
+  return getServerConfig().runtimeUrl.replace(/\/$/, "");
+}
+
 
 /** A backend error surfaced to the UI. `message` is safe to display. */
 export class ApiError extends Error {
@@ -36,7 +73,7 @@ export async function backendRequest<T>(
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth && authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-  const res = await fetch(`${BACKEND_URL}${path}`, {
+  const res = await fetch(`${backendUrl()}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),

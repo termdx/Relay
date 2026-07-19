@@ -287,6 +287,15 @@ export class RuntimeEngine {
         }
       }
     }
+    // Hosted deployments export RELAY_PUBLIC_URL (https://relay.agency.com):
+    // it becomes the approval-link base and the portal URL in emails.
+    if (process.env.RELAY_PUBLIC_URL) {
+      const publicUrl = process.env.RELAY_PUBLIC_URL.replace(/\/$/, '');
+      env.PUBLIC_BASE_URL = publicUrl;
+      env.PUBLIC_PORTAL_URL = publicUrl;
+      integrationEnvKeys.push('PUBLIC_BASE_URL', 'PUBLIC_PORTAL_URL');
+    }
+
     // Transcript ingest: every workspace gets a generated shared secret so
     // notetakers/automation can POST transcripts (webhooks/transcript/:project).
     env.INGEST_SECRET = await this.ensureSecret('ingest.secret', () =>

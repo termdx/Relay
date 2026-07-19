@@ -1,0 +1,127 @@
+name: dist
+
+# Distribution builds: push to the `dist` branch to cut a release.
+#   git push origin main:dist
+# Produces: runtime binaries (macOS arm64, Linux x64), desktop bundles
+# (dmg / deb+AppImage), the portal static bundle, and the backend Docker
+# image on GHCR — all attached to a GitHub Release tagged dist-<run>.
+
+on:
+  push:
+    branches: [dist]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  runtime:
+    name: runtime binary (${{ matrix.triple }})
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            triple: aarch64-apple-darwin
+          - os: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-sidecar.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relay-runtime-${{ matrix.triple }}
+          path: apps/desktop/src-tauri/binaries/relay-runtime-${{ matrix.triple }}
+
+  desktop:
+    name: desktop bundle (${{ matrix.os }})
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            bundles: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          - os: ubuntu-latest
+            bundles: |
+              apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+              apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux webkit deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf libssl-dev
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with: { workspaces: apps/desktop/src-tauri }
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-sidecar.mjs
+      - run: pnpm --filter @relay/desktop tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: ${{ matrix.bundles }}
+
+  portal:
+    name: portal bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @relay/portal build
+      - run: tar czf portal-dist.tar.gz -C apps/portal/dist .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portal-dist
+          path: portal-dist.tar.gz
+
+  backend-image:
+    name: backend image → GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/relay-backend
+          IMAGE=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
+          docker build -t "$IMAGE:dist-${{ github.run_number }}" -t "$IMAGE:latest" services/backend
+          docker push "$IMAGE:dist-${{ github.run_number }}"
+          docker push "$IMAGE:latest"
+
+  release:
+    name: publish release
+    needs: [runtime, desktop, portal, backend-image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: assets, merge-multiple: true }
+      - run: ls -la assets/
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dist-${{ github.run_number }}
+          name: Relay dist-${{ github.run_number }}
+          make_latest: true
+          files: assets/**

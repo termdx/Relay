@@ -1,4 +1,4 @@
-import { RUNTIME_URL } from "./http";
+import { getServerConfig, runtimeUrl } from "./http";
 import type {
   AiProviderSummary,
   IntegrationSummary,
@@ -21,9 +21,13 @@ export class RuntimeError extends Error {
 }
 
 async function rpc<T>(path: string[], args: unknown[]): Promise<T> {
-  const res = await fetch(`${RUNTIME_URL}/rpc`, {
+  const { runtimeToken } = getServerConfig();
+  const res = await fetch(`${runtimeUrl()}/rpc`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(runtimeToken ? { "x-relay-token": runtimeToken } : {}),
+    },
     body: JSON.stringify({ path, args }),
   });
   const data = (await res.json()) as RpcResponse<T>;
@@ -42,8 +46,8 @@ export interface DaemonHealth {
 /** Is the Runtime daemon reachable, and which workspace does it serve? */
 export async function daemonHealth(): Promise<DaemonHealth | null> {
   try {
-    const res = await fetch(`${RUNTIME_URL}/health`, {
-      signal: AbortSignal.timeout(1500),
+    const res = await fetch(`${runtimeUrl()}/health`, {
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
     return (await res.json()) as DaemonHealth;

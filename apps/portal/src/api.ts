@@ -1,8 +1,12 @@
 /** Portal API client. Every data call carries the portal session token. */
 
+/** Dev server talks to localhost:3000; a deployed portal is served from the
+ * same domain as the backend (Caddy routes API paths), so same-origin. */
 export const BACKEND_URL: string =
   (import.meta.env.VITE_BACKEND_URL as string | undefined) ??
-  "http://localhost:3000";
+  (window.location.port === "5174"
+    ? "http://localhost:3000"
+    : window.location.origin);
 
 const TOKEN_KEY = "relay-portal-token";
 

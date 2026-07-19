@@ -69,7 +69,24 @@ export function buildServer(): FastifyInstance {
       cb(null, origins.has(origin));
     },
     methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['content-type', 'x-relay-token'],
   });
+
+  // Remote deployments set RELAY_RUNTIME_TOKEN: every request except /health
+  // must present it. Locally (no token set) the daemon stays loopback-open.
+  const runtimeToken = process.env.RELAY_RUNTIME_TOKEN;
+  if (runtimeToken) {
+    app.addHook('onRequest', (request, reply, done) => {
+      if (request.url === '/health' || request.method === 'OPTIONS') {
+        return done();
+      }
+      if (request.headers['x-relay-token'] !== runtimeToken) {
+        reply.code(401).send({ ok: false, error: 'runtime token required' });
+        return;
+      }
+      done();
+    });
+  }
 
   // Clients read `workspace` from here rather than sending a relative path —
   // the daemon owns a well-known location, not whatever cwd it was started in.

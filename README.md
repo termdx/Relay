@@ -66,3 +66,64 @@ pnpm dev:web          # desktop UI in the browser — no Rust build
 pnpm desktop:build    # produce a production desktop bundle
 ```
 
+## Distribution
+
+Two installers, one CI pipeline. Releases are cut by pushing to the `dist`
+branch — GitHub Actions (`.github/workflows/dist.yml`) builds every artifact
+and attaches it to a release tagged `dist-<n>`:
+
+| Artifact | Built on |
+|---|---|
+| `relay-runtime-<triple>` — standalone runtime daemon binary (bun-compiled) | macOS arm64, Linux x64 |
+| Desktop bundles — `.dmg` / `.deb` + `.AppImage` (Tauri, sidecar included) | macOS arm64, Linux x64 |
+| `portal-dist.tar.gz` — client portal static bundle | any |
+| `ghcr.io/<owner>/relay-backend` — backend Docker image | any |
+
+```bash
+git push origin main:dist     # cut a release
+```
+
+### Server install (agency VPS) — runtime + whole stack
+
+One script installs the runtime binary, pulls the backend image, starts the
+stack (Postgres + backend via the runtime's generated compose), and — given a
+domain — serves the client portal with automatic TLS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/termdx/Relay/main/scripts/install-server.sh \
+  | bash -s -- --domain relay.youragency.com
+```
+
+Requires Docker and DNS (`relay.youragency.com` → the box). The installer:
+
+- installs `relay-runtime` to `/usr/local/bin` + a systemd service
+- generates a **runtime token** (`RELAY_RUNTIME_TOKEN`) — the daemon rejects
+  any request without it; the token is printed at the end for the desktop
+- exports `RELAY_PUBLIC_URL=https://<domain>` so approval links, portal
+  sign-in emails, and webhook URLs all point at the real domain
+- runs Caddy: the portal is served at `https://<domain>`, with `/portal/*`,
+  `/approve/*`, `/webhooks/*`, and `/branding` proxied to the backend —
+  which means notetaker/GitHub webhooks land on the same domain
+
+### Desktop install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/termdx/Relay/main/scripts/install-desktop.sh | bash
+```
+
+macOS gets the `.dmg`, Linux an `.AppImage`. On first run the app uses the
+local stack; to work against an agency server open **Settings → Agency
+server** and enter the Backend URL (`https://relay.youragency.com`), the
+Runtime URL, and the runtime token from the server installer. Reach the
+runtime daemon over a VPN/SSH tunnel, or proxy it behind the same domain.
+
+### Hosting model
+
+```
+relay.youragency.com  ──▶  Caddy (TLS)
+   ├── /portal/* /approve/* /webhooks/* /branding  → backend :3000
+   └── everything else                              → portal static files
+Runtime daemon :51720 (token-protected)  → generates & drives the compose stack
+Desktop app (each teammate's machine)    → backend + runtime, by URL + token
+```
+
