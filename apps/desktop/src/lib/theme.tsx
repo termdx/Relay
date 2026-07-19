@@ -1,10 +1,10 @@
 import * as React from "react";
 
 /**
- * Theme is dark-first (the product lives next to a terminal and an IDE) but
- * user-switchable. The `.dark` class on <html> is applied synchronously by a
- * boot script in index.html to avoid a flash; this provider owns changes
- * after mount and keeps localStorage in sync.
+ * Theme is light by default, user-switchable (dark or follow-the-OS). The
+ * `.dark` class on <html> is applied synchronously by a boot script in
+ * index.html to avoid a flash; this provider owns changes after mount and
+ * keeps localStorage in sync.
  */
 export type Theme = "dark" | "light" | "system";
 
@@ -32,7 +32,7 @@ function apply(theme: Theme) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = React.useState<Theme>(() => {
     const stored = localStorage.getItem(THEME_KEY);
-    return stored === "light" || stored === "system" ? stored : "dark";
+    return stored === "dark" || stored === "system" ? stored : "light";
   });
 
   const setTheme = React.useCallback((next: Theme) => {

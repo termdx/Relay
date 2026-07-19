@@ -177,7 +177,7 @@ function AppearanceSection() {
             Theme
           </Label>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Dark is the default — Relay lives next to your terminal.
+            Light by default — switch to Dark or follow your OS.
           </p>
         </div>
         <Select value={theme} onValueChange={(v) => setTheme(v as Theme)}>
