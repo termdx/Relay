@@ -61,11 +61,19 @@ curl -fsSL "$BIN_URL" -o /tmp/relay-runtime
 $SUDO install -m 0755 /tmp/relay-runtime /usr/local/bin/relay-runtime
 
 # ── backend image ───────────────────────────────────────────────────────────
+# The runtime's compose references relay-backend:local. Prefer GHCR; fall
+# back to the release tarball when the package is private (org policy).
 OWNER=$(echo "$REPO" | cut -d/ -f1 | tr '[:upper:]' '[:lower:]')
-say "pulling backend image ghcr.io/$OWNER/relay-backend:latest…"
-docker pull "ghcr.io/$OWNER/relay-backend:latest"
-# The runtime's compose references relay-backend:local — point it at the pull.
-docker tag "ghcr.io/$OWNER/relay-backend:latest" relay-backend:local
+if docker pull "ghcr.io/$OWNER/relay-backend:latest" 2>/dev/null; then
+  say "backend image pulled from GHCR."
+  docker tag "ghcr.io/$OWNER/relay-backend:latest" relay-backend:local
+else
+  IMG_URL=$(asset_url "relay-backend-image.tar.gz")
+  [ -n "$IMG_URL" ] || die "GHCR pull failed and the release has no image tarball."
+  say "GHCR is private — downloading the image from the release instead…"
+  curl -fsSL "$IMG_URL" | gunzip | docker load
+  docker tag relay-backend:release relay-backend:local
+fi
 
 # ── runtime service ─────────────────────────────────────────────────────────
 RUNTIME_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)

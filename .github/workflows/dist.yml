@@ -109,6 +109,14 @@ jobs:
           docker build -t "$IMAGE:dist-${{ github.run_number }}" -t "$IMAGE:latest" services/backend
           docker push "$IMAGE:dist-${{ github.run_number }}"
           docker push "$IMAGE:latest"
+          # Also ship the image as a release asset: installs keep working
+          # even when the GHCR package is private (org policy).
+          docker tag "$IMAGE:latest" relay-backend:release
+          docker save relay-backend:release | gzip > relay-backend-image.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-image
+          path: relay-backend-image.tar.gz
 
   release:
     name: publish release
