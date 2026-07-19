@@ -76,7 +76,13 @@ else
 fi
 
 # ── runtime service ─────────────────────────────────────────────────────────
-RUNTIME_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)
+# Re-runs keep the existing token so already-connected desktops stay valid.
+if [ -f /etc/relay/runtime.env ] && grep -q RELAY_RUNTIME_TOKEN /etc/relay/runtime.env; then
+  RUNTIME_TOKEN=$(grep '^RELAY_RUNTIME_TOKEN=' /etc/relay/runtime.env | cut -d= -f2)
+  say "reusing existing runtime token."
+else
+  RUNTIME_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)
+fi
 $SUDO mkdir -p /etc/relay
 printf 'RELAY_RUNTIME_TOKEN=%s\n' "$RUNTIME_TOKEN" | $SUDO tee /etc/relay/runtime.env >/dev/null
 [ -n "$DOMAIN" ] && printf 'RELAY_PUBLIC_URL=https://%s\n' "$DOMAIN" | $SUDO tee -a /etc/relay/runtime.env >/dev/null
@@ -101,7 +107,8 @@ User=$(id -un)
 WantedBy=multi-user.target
 UNIT
   $SUDO systemctl daemon-reload
-  $SUDO systemctl enable --now relay-runtime
+  $SUDO systemctl enable relay-runtime >/dev/null 2>&1
+  $SUDO systemctl restart relay-runtime
 else
   say "no systemd — start the daemon manually:"
   say "  RELAY_RUNTIME_TOKEN=$RUNTIME_TOKEN relay-runtime &"
@@ -150,6 +157,14 @@ $DOMAIN {
   handle @api {
     reverse_proxy localhost:3000
   }
+  # Full backend API for the desktop app: https://<domain>/api → backend
+  handle_path /api/* {
+    reverse_proxy localhost:3000
+  }
+  # Runtime daemon for the desktop app (token-gated): https://<domain>/runtime
+  handle_path /runtime/* {
+    reverse_proxy localhost:51720
+  }
   handle {
     root * /srv/portal
     try_files {path} /index.html
@@ -175,7 +190,12 @@ say "  runtime token  : $RUNTIME_TOKEN"
 [ -n "$DOMAIN" ] && say "  client portal  : https://$DOMAIN"
 say ""
 say "Connect the desktop app: Settings → Agency server →"
-[ -n "$DOMAIN" ] && say "  Backend URL : https://$DOMAIN" || say "  Backend URL : http://<this-host>:3000"
-say "  Runtime URL : http://<this-host>:51720   (expose via VPN/SSH tunnel, or proxy it)"
+if [ -n "$DOMAIN" ]; then
+  say "  Backend URL : https://$DOMAIN/api"
+  say "  Runtime URL : https://$DOMAIN/runtime"
+else
+  say "  Backend URL : http://<this-host>:3000"
+  say "  Runtime URL : http://<this-host>:51720   (expose via VPN/SSH tunnel, or proxy it)"
+fi
 say "  Token       : $RUNTIME_TOKEN"
 say "───────────────────────────────────────────────────────────"

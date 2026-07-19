@@ -107,6 +107,9 @@ Requires Docker and DNS (`relay.youragency.com` → the box). The installer:
 - runs Caddy: the portal is served at `https://<domain>`, with `/portal/*`,
   `/approve/*`, `/webhooks/*`, and `/branding` proxied to the backend —
   which means notetaker/GitHub webhooks land on the same domain
+- also proxies `/api/*` → backend and `/runtime/*` → runtime daemon, so the
+  desktop app connects entirely over HTTPS on the domain — no VPN or extra
+  open ports (only 80/443 need to be reachable)
 
 ### Desktop install
 
@@ -116,17 +119,19 @@ curl -fsSL https://raw.githubusercontent.com/termdx/Relay/main/scripts/install-d
 
 macOS gets the `.dmg`, Linux the `.deb`. On first run the app uses the
 local stack; to work against an agency server open **Settings → Agency
-server** and enter the Backend URL (`https://relay.youragency.com`), the
-Runtime URL, and the runtime token from the server installer. Reach the
-runtime daemon over a VPN/SSH tunnel, or proxy it behind the same domain.
+server** and enter the Backend URL (`https://relay.youragency.com/api`),
+the Runtime URL (`https://relay.youragency.com/runtime`), and the runtime
+token printed by the server installer.
 
 ### Hosting model
 
 ```
 relay.youragency.com  ──▶  Caddy (TLS)
    ├── /portal/* /approve/* /webhooks/* /branding  → backend :3000
+   ├── /api/*      (desktop app)                    → backend :3000
+   ├── /runtime/*  (desktop app, token-gated)       → runtime daemon :51720
    └── everything else                              → portal static files
 Runtime daemon :51720 (token-protected)  → generates & drives the compose stack
-Desktop app (each teammate's machine)    → backend + runtime, by URL + token
+Desktop app (each teammate's machine)    → https://<domain>/api + /runtime + token
 ```
 
