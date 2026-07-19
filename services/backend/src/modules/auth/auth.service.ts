@@ -103,6 +103,19 @@ export class AuthService {
     return this.findById(id);
   }
 
+  /** The whole team, for the members list. */
+  async listUsers(): Promise<PublicUser[]> {
+    const rows = await this.db.select().from(users);
+    return rows
+      .map(toPublicUser)
+      .sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'owner' ? -1 : 1));
+  }
+
+  /** Issue a session for an existing user record (e.g. invite redemption). */
+  issueFor(user: User): Promise<AuthResult> {
+    return this.issue(user);
+  }
+
   private async issue(user: User): Promise<AuthResult> {
     const payload: JwtPayload = {
       sub: user.id,

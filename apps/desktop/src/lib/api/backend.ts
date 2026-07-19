@@ -8,6 +8,7 @@ import type {
   CreateMeetingInput,
   CreateProjectInput,
   Decision,
+  InviteView,
   Meeting,
   ProjectWithClient,
   PublicUser,
@@ -37,6 +38,17 @@ export const backend = {
     me: () => backendRequest<PublicUser>("/auth/me"),
     updateMe: (body: { name?: string; avatar?: string }) =>
       backendRequest<PublicUser>("/auth/me", { method: "PATCH", body }),
+    members: () => backendRequest<PublicUser[]>("/auth/members"),
+    invites: {
+      list: () => backendRequest<InviteView[]>("/auth/invites"),
+      create: (body: { maxUses?: number } = {}) =>
+        backendRequest<InviteView & { token: string }>("/auth/invites", {
+          method: "POST",
+          body,
+        }),
+      revoke: (id: string) =>
+        backendRequest<void>(`/auth/invites/${id}`, { method: "DELETE" }),
+    },
   },
   clients: {
     list: () => backendRequest<ClientWithProjects[]>("/clients"),
@@ -148,6 +160,11 @@ export const backend = {
       backendRequest<{ meeting: Meeting; approvalUrl: string }>(
         `/meetings/${id}/send-for-approval`,
         { method: "POST" },
+      ),
+    /** The live magic link for a PENDING_APPROVAL meeting (null otherwise). */
+    approvalLink: (id: string) =>
+      backendRequest<{ approvalUrl: string | null }>(
+        `/meetings/${id}/approval-link`,
       ),
   },
 };

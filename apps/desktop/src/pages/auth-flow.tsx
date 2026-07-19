@@ -2,9 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { WifiOff } from "lucide-react";
 import * as React from "react";
 import { ServerSettingsCard } from "@/components/server-settings";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { backend } from "@/lib/api/backend";
 import { getServerConfig } from "@/lib/api/http";
+import { JoinForm } from "@/pages/join";
 import { LoginForm } from "@/pages/login";
 import { SetupForm } from "@/pages/setup";
 
@@ -18,7 +20,9 @@ import { SetupForm } from "@/pages/setup";
  * to a hosted Relay must be possible before any account exists.
  */
 export function AuthFlow() {
-  const [showServer, setShowServer] = React.useState(false);
+  const [mode, setMode] = React.useState<"signin" | "server" | "join">(
+    "signin",
+  );
   const status = useQuery({
     queryKey: ["auth-status"],
     queryFn: backend.auth.status,
@@ -39,9 +43,15 @@ export function AuthFlow() {
         </div>
 
         {status.isLoading ? (
-          <div className="flex justify-center py-10 text-muted-foreground">
+          <div
+            role="status"
+            className="flex justify-center py-10 text-muted-foreground"
+          >
             <Spinner className="size-5" />
+            <span className="sr-only">Checking the backend…</span>
           </div>
+        ) : mode === "join" ? (
+          <JoinForm />
         ) : status.isError ? (
           <div className="flex flex-col gap-4">
             <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-sm">
@@ -53,11 +63,23 @@ export function AuthFlow() {
                   <span className="font-mono">{getServerConfig().backendUrl}</span>.
                   Start the local stack, or connect to your agency’s server below.
                 </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => status.refetch()}
+                  disabled={status.isRefetching}
+                >
+                  {status.isRefetching ? (
+                    <Spinner className="size-4" />
+                  ) : null}
+                  Try again
+                </Button>
               </div>
             </div>
             <ServerSettingsCard />
           </div>
-        ) : showServer ? (
+        ) : mode === "server" ? (
           <ServerSettingsCard />
         ) : status.data?.needsSetup ? (
           <SetupForm />
@@ -65,14 +87,39 @@ export function AuthFlow() {
           <LoginForm />
         )}
 
-        {!status.isLoading && !status.isError && (
-          <button
-            type="button"
-            onClick={() => setShowServer((s) => !s)}
-            className="mt-6 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
-          >
-            {showServer ? "Back to sign in" : "Connect to an agency server"}
-          </button>
+        {!status.isLoading && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            {mode !== "signin" ? (
+              <button
+                type="button"
+                onClick={() => setMode("signin")}
+                className="rounded-sm text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Back to sign in
+              </button>
+            ) : (
+              <>
+                {/* Joining works even when the configured backend is down —
+                    the invite link carries its own server. */}
+                <button
+                  type="button"
+                  onClick={() => setMode("join")}
+                  className="rounded-sm text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Have an invite? Join your agency
+                </button>
+                {!status.isError && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("server")}
+                    className="rounded-sm text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Connect to an agency server
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>

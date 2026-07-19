@@ -78,6 +78,13 @@
       "when": 1784394398974,
       "tag": "0010_steep_star_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784472197849,
+      "tag": "0011_strong_banshee",
+      "breakpoints": true
     }
   ]
 }

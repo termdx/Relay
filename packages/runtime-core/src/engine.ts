@@ -295,6 +295,13 @@ export class RuntimeEngine {
       env.PUBLIC_PORTAL_URL = publicUrl;
       integrationEnvKeys.push('PUBLIC_BASE_URL', 'PUBLIC_PORTAL_URL');
     }
+    // Invite links hand joining teammates a ready-to-use desktop connection,
+    // so the backend needs the daemon's token to include in the redeem
+    // response. Same trust domain — the daemon drives this backend anyway.
+    if (process.env.RELAY_RUNTIME_TOKEN) {
+      env.RELAY_RUNTIME_TOKEN = process.env.RELAY_RUNTIME_TOKEN;
+      integrationEnvKeys.push('RELAY_RUNTIME_TOKEN');
+    }
 
     // Transcript ingest: every workspace gets a generated shared secret so
     // notetakers/automation can POST transcripts (webhooks/transcript/:project).

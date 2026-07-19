@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule, type JwtSignOptions } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { InviteService } from './invite.service';
 import { PasswordService } from './password.service';
 
 @Module({
@@ -24,7 +25,7 @@ import { PasswordService } from './password.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService],
+  providers: [AuthService, InviteService, PasswordService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

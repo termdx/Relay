@@ -67,14 +67,87 @@ function useBranding() {
 /* ── auth shell ──────────────────────────────────────────────────────────── */
 
 export default function App() {
-  // Magic links land on /auth/<token>; everything else is the app.
+  // Magic links land on /auth/<token>; team invites on /join/<token>;
+  // everything else is the client portal.
   const authToken = window.location.pathname.startsWith("/auth/")
     ? window.location.pathname.slice("/auth/".length)
     : null;
 
   if (authToken) return <Redeem token={authToken} />;
+  if (window.location.pathname.startsWith("/join/")) return <JoinLanding />;
   if (!session.get()) return <Login />;
   return <Portal />;
+}
+
+/**
+ * Where a team invite link lands in a browser. The actual signup happens in
+ * the desktop app — this page gets the teammate the app and the link.
+ */
+function JoinLanding() {
+  const branding = useBranding();
+  const inviteUrl = window.location.href;
+  const [copied, setCopied] = React.useState(false);
+
+  async function copy() {
+    await navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <Centered>
+      <div className="w-full max-w-md text-center">
+        {branding.logo ? (
+          <img src={branding.logo} alt="" className="mx-auto mb-4 size-12 rounded-lg object-contain" />
+        ) : null}
+        <h1 className="text-xl font-semibold">
+          Join {branding.name} on Relay
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          You’ve been invited to the team. Two steps and you’re in.
+        </p>
+
+        <div className="mt-6 rounded-lg border border-border bg-card p-4 text-left">
+          <p className="text-sm font-medium">1. Get the Relay desktop app</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <a
+              href="/downloads/Relay.dmg"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Download for macOS
+            </a>
+            <a
+              href="/downloads/relay-desktop.deb"
+              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+            >
+              Download for Linux
+            </a>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-border bg-card p-4 text-left">
+          <p className="text-sm font-medium">
+            2. Open Relay → “Have an invite? Join your agency” → paste this link
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs">
+              {inviteUrl}
+            </code>
+            <button
+              onClick={copy}
+              className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+            >
+              {copied ? "Copied ✓" : "Copy"}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            You’ll pick your own email and password — nobody manages your
+            account for you.
+          </p>
+        </div>
+      </div>
+    </Centered>
+  );
 }
 
 function Redeem({ token }: { token: string }) {

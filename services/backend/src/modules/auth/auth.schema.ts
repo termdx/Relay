@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export type UserRole = 'owner' | 'member';
 
@@ -17,6 +17,28 @@ export const users = pgTable('users', {
 });
 
 export type User = typeof users.$inferSelect;
+
+/**
+ * Team invite links. The raw token only ever appears in the link itself —
+ * the DB stores its sha256, so a leaked dump can't mint memberships.
+ */
+export const invites = pgTable('invites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tokenHash: text('token_hash').notNull().unique(),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  /** null = unlimited uses until expiry/revocation. */
+  maxUses: integer('max_uses'),
+  usedCount: integer('used_count').notNull().default(0),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type Invite = typeof invites.$inferSelect;
 
 /** The shape safe to return over the API — never includes passwordHash. */
 export interface PublicUser {

@@ -11,6 +11,23 @@ export interface PublicUser {
   avatar: string | null;
 }
 
+export interface InviteView {
+  id: string;
+  url: string | null;
+  expiresAt: string;
+  maxUses: number | null;
+  usedCount: number;
+  revoked: boolean;
+  createdAt: string;
+}
+
+/** Desktop connection bundle handed out when redeeming an invite. */
+export interface ServerConnection {
+  backendUrl: string;
+  runtimeUrl: string;
+  runtimeToken: string | null;
+}
+
 export interface AuthResult {
   accessToken: string;
   user: PublicUser;

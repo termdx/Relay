@@ -17,6 +17,8 @@ interface AuthContextValue {
   logout: () => void;
   /** Push a fresh PublicUser into context (e.g. after a profile update). */
   updateUser: (next: PublicUser) => void;
+  /** Adopt a session issued elsewhere (e.g. redeeming an invite link). */
+  adopt: (accessToken: string, user: PublicUser) => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, status, login, register, logout, updateUser }}
+      value={{ user, status, login, register, logout, updateUser, adopt: apply }}
     >
       {children}
     </AuthContext.Provider>

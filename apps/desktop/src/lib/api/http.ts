@@ -86,6 +86,27 @@ export async function backendRequest<T>(
   return (await res.json()) as T;
 }
 
+/**
+ * Like backendRequest but against an explicit server. Invite joins must talk
+ * to the invite's server, which is usually not the configured backend yet.
+ */
+export async function externalRequest<T>(
+  baseUrl: string,
+  path: string,
+  { method = "GET", body }: Omit<RequestOptions, "auth"> = {},
+): Promise<T> {
+  const res = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new ApiError(await errorMessage(res), res.status);
+  }
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
 async function errorMessage(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as { message?: string | string[] };
